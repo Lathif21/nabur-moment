@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.title} · Nabur Moment</title>
+	<title>{data.title} · {data.site.businessName}</title>
 </svelte:head>
 
 <section class="border-t border-sage section-pad">

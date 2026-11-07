@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import CircleAlert from '@lucide/svelte/icons/circle-alert';
 	import Check from '@lucide/svelte/icons/check';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
@@ -10,7 +9,10 @@
 	export type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
 	type Props = {
-		page: string;
+		/** Autosave endpoint (PUT { data, visible }) */
+		saveUrl: string;
+		/** Show the Tampilkan switch (page sections); settings have none */
+		toggle?: boolean;
 		def: SectionDef;
 		initial: { draft: Record<string, unknown>; draftVisible: boolean; dirty: boolean };
 		media: Record<string, MediaItem>;
@@ -19,7 +21,7 @@
 		onstate: (key: string, state: SaveState) => void;
 	};
 
-	let { page, def, initial, media, canEdit, onstate }: Props = $props();
+	let { saveUrl, toggle = true, def, initial, media, canEdit, onstate }: Props = $props();
 
 	// The editor owns the draft from here on; the page remounts the card after Terbitkan
 	// svelte-ignore state_referenced_locally
@@ -47,7 +49,7 @@
 		if (body === last) return setStatus(status === 'pending' ? 'saved' : status);
 		setStatus('saving');
 		try {
-			const res = await fetch(resolve('/admin/api/cms/[page]/[key]', { page, key: def.key }), {
+			const res = await fetch(saveUrl, {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
 				body
@@ -101,10 +103,12 @@
 					<CircleAlert size={13} class="text-danger" aria-hidden="true" /> Gagal
 				{/if}
 			</span>
-			<label class="flex items-center gap-2 text-small">
-				<input type="checkbox" class="checkbox" bind:checked={visible} disabled={!canEdit} />
-				Tampilkan
-			</label>
+			{#if toggle}
+				<label class="flex items-center gap-2 text-small">
+					<input type="checkbox" class="checkbox" bind:checked={visible} disabled={!canEdit} />
+					Tampilkan
+				</label>
+			{/if}
 		</div>
 	</header>
 

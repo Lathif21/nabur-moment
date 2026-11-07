@@ -90,7 +90,7 @@
 			{#each def.sections as s (s.key)}
 				{@const initial = data.sections.find((x) => x.key === s.key)!}
 				<SectionCard
-					page={data.pageKey}
+					saveUrl={resolve('/admin/api/cms/[page]/[key]', { page: data.pageKey, key: s.key })}
 					def={s}
 					{initial}
 					{media}

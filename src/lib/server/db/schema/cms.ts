@@ -32,3 +32,13 @@ export const pageSection = pgTable(
 	},
 	(t) => [unique('page_section_page_key').on(t.page, t.key)]
 );
+
+/** Pengaturan → Situs: a single row (id = 1), draft + published like page sections */
+export const siteSettings = pgTable('site_settings', {
+	id: smallint('id').primaryKey().default(1),
+	draft: jsonb('draft').$type<Record<string, unknown>>().notNull(),
+	published: jsonb('published').$type<Record<string, unknown>>(),
+	publishedAt: timestamp('published_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+	updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
+});

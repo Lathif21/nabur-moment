@@ -6,13 +6,33 @@
 	import SiteHeader from '#lib/components/site/SiteHeader.svelte';
 	import type { LayoutProps } from './$types';
 
-	let { children }: LayoutProps = $props();
+	let { data, children }: LayoutProps = $props();
 
 	// Pages that open with a full-bleed dark hero return { headerOverlay: true } from their load
 	const overlay = $derived(page.data.headerOverlay === true);
 	// Drafts are on screen (?preview=1 with an admin session)
 	const preview = $derived(page.data.preview === true);
+
+	const site = $derived(data.site);
+	const src = (id: string | null) => (id ? (data.siteMedia[id]?.src ?? null) : null);
+	const logoLight = $derived(src(site.logoLight));
+	const logoDark = $derived(src(site.logoDark));
+	const shareImage = $derived(src(site.shareImage));
 </script>
+
+<!-- Site-wide defaults from published settings; pages add their own title (per-page SEO in P1-09) -->
+<svelte:head>
+	<meta name="description" content={site.seoDescription} />
+	<meta property="og:site_name" content={site.businessName} />
+	<meta property="og:type" content="website" />
+	<meta property="og:locale" content="id_ID" />
+	<meta property="og:title" content={site.seoTitle} />
+	<meta property="og:description" content={site.seoDescription} />
+	{#if shareImage}
+		<meta property="og:image" content={shareImage} />
+		<meta name="twitter:card" content="summary_large_image" />
+	{/if}
+</svelte:head>
 
 <a
 	href="#konten"
@@ -21,11 +41,11 @@
 >
 
 <div class="flex min-h-dvh flex-col">
-	<SiteHeader {overlay} />
+	<SiteHeader {overlay} name={site.businessName} {logoLight} {logoDark} />
 	<main id="konten" class="flex-1">
 		{@render children()}
 	</main>
-	<SiteFooter />
+	<SiteFooter {site} logo={logoLight} />
 </div>
 
 {#if preview}

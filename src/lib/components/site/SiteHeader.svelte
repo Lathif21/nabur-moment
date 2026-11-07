@@ -4,15 +4,20 @@
 	import { page } from '$app/state';
 	import Menu from '@lucide/svelte/icons/menu';
 	import X from '@lucide/svelte/icons/x';
-	import Wordmark from '#lib/components/Wordmark.svelte';
+	import Logo from './Logo.svelte';
 	import { bookingHref, siteNav } from '#lib/nav.ts';
 
 	type Props = {
 		/** Transparent with cream text over a dark hero photo; otherwise cream bar with forest text */
 		overlay?: boolean;
+		/** Business name (logo alt text) */
+		name: string;
+		/** Uploaded logos from site settings: light for dark backgrounds, dark for light ones */
+		logoLight: string | null;
+		logoDark: string | null;
 	};
 
-	let { overlay = false }: Props = $props();
+	let { overlay = false, name, logoLight, logoDark }: Props = $props();
 	let menuOpen = $state(false);
 
 	const current = (href: string) => page.url.pathname === '/' + href;
@@ -25,8 +30,8 @@
 	]}
 >
 	<div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:h-24 lg:px-10">
-		<a href={resolve('')} aria-label="Nabur Moment, ke beranda">
-			<Wordmark tone={overlay ? 'cream' : 'forest'} size="sm" />
+		<a href={resolve('')} aria-label="{name}, ke beranda">
+			<Logo src={overlay ? logoLight : logoDark} {name} tone={overlay ? 'cream' : 'forest'} />
 		</a>
 
 		<nav aria-label="Menu utama" class="hidden items-center gap-8 lg:flex">
@@ -62,7 +67,7 @@
 		<Dialog.Content class="fixed inset-0 z-50 flex flex-col bg-forest text-cream lg:hidden">
 			<Dialog.Title class="sr-only">Menu</Dialog.Title>
 			<div class="flex h-20 items-center justify-between px-5">
-				<Wordmark tone="cream" size="sm" />
+				<Logo src={logoLight} {name} tone="cream" />
 				<Dialog.Close
 					type="button"
 					class="-mr-2 inline-flex size-11 items-center justify-center"

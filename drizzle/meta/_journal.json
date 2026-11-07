@@ -36,6 +36,13 @@
       "when": 1794083294698,
       "tag": "0004_cms",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794084114695,
+      "tag": "0005_site_settings",
+      "breakpoints": true
     }
   ]
 }

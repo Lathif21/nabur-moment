@@ -26,8 +26,7 @@
 
 <!-- Beranda from the CMS. Only the hero is rendered so far; the other sections arrive in P1-06. -->
 <svelte:head>
-	<title>Nabur Moment</title>
-	<meta name="description" content="Wedding content creator. Situs sedang disiapkan." />
+	<title>{data.site.seoTitle}</title>
 </svelte:head>
 
 {#if hero.visible}
