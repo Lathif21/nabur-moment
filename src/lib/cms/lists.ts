@@ -1,7 +1,7 @@
-// CMS lists (packages + add-ons, testimonials, FAQ; portfolio arrives in P1-07): the shapes
+// CMS lists (portfolio, packages + add-ons, testimonials, FAQ): the shapes
 // published into `list_publish` and read by the public site. Client-safe; relative imports only.
 
-export const LISTS = ['packages', 'testimonials', 'faq'] as const;
+export const LISTS = ['portfolio', 'packages', 'testimonials', 'faq'] as const;
 export type ListKey = (typeof LISTS)[number];
 
 export type FaqSnapshot = { id: string; question: string; answer: string }[];
@@ -33,13 +33,34 @@ export type PackagesSnapshot = {
 	addons: { id: string; name: string; price: number; description: string }[];
 };
 
+/** One published album: what /portofolio and /portofolio/[slug] show */
+export type PublishedAlbum = {
+	id: string;
+	slug: string;
+	title: string;
+	eventType: string;
+	/** yyyy-MM-dd */
+	eventDate: string | null;
+	venue: string;
+	city: string;
+	story: string;
+	/** Media id */
+	cover: string | null;
+	featured: boolean;
+	items: { media: string; caption: string }[];
+};
+
+export type PortfolioSnapshot = PublishedAlbum[];
+
 export type ListSnapshots = {
+	portfolio: PortfolioSnapshot;
 	packages: PackagesSnapshot;
 	testimonials: TestimonialSnapshot;
 	faq: FaqSnapshot;
 };
 
 export const EMPTY: ListSnapshots = {
+	portfolio: [],
 	packages: { categories: [], addons: [] },
 	testimonials: [],
 	faq: []
@@ -47,6 +68,8 @@ export const EMPTY: ListSnapshots = {
 
 /** Public paths that show each list (revalidated after Terbitkan) */
 export const LIST_PATHS: Record<ListKey, string[]> = {
+	// Album pages are added per slug at publish time
+	portfolio: ['portofolio', ''],
 	packages: ['paket', ''],
 	testimonials: [''],
 	faq: ['faq']
