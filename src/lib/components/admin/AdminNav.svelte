@@ -4,26 +4,30 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import Wordmark from '#lib/components/Wordmark.svelte';
-	import { adminNav, isActive } from '#lib/nav.ts';
+	import { isActive, visibleAdminNav } from '#lib/nav.ts';
 
 	type Props = {
 		/** The logged-in user, shown above "Keluar" */
 		user: { name: string; email: string };
+		/** The user's permission set; menus they cannot read are hidden */
+		perms: string[];
 		/** Called after a link is followed (closes the phone menu) */
 		onnavigate?: () => void;
 	};
 
-	let { user, onnavigate }: Props = $props();
+	let { user, perms, onnavigate }: Props = $props();
+
+	const groups = $derived(visibleAdminNav(perms));
 </script>
 
-<!-- Sidebar content, shared by the desktop column and the phone menu. Filtered by permission from P0-05. -->
+<!-- Sidebar content, shared by the desktop column and the phone menu. Filtered by permission. -->
 <div class="flex h-full flex-col bg-forest text-cream">
 	<div class="flex justify-center px-5 pt-7 pb-6">
 		<Wordmark tone="cream" size="sm" />
 	</div>
 
 	<nav aria-label="Menu admin" class="flex-1 overflow-y-auto px-3 pb-4">
-		{#each adminNav as group, i (group.label ?? i)}
+		{#each groups as group, i (group.label ?? i)}
 			<div class={['flex flex-col gap-0.5', i > 0 && 'mt-5']}>
 				{#if group.label}
 					<p class="px-3 pb-1.5 eyebrow text-[0.6875rem] text-cream/75">{group.label}</p>

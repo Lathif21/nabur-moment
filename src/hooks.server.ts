@@ -2,6 +2,8 @@ import type { Handle } from '@sveltejs/kit/hooks';
 import { building } from '$app/env';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { auth } from '#lib/server/auth.ts';
+import { db } from '#lib/server/db/index.ts';
+import { loadPermissions } from '#lib/server/services/access.ts';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	// Only the admin, the auth API and draft previews need a session; public pages stay cacheable
@@ -16,6 +18,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (session?.user.active) {
 			event.locals.user = session.user;
 			event.locals.session = session.session;
+			// Loaded here, not in a layout: form actions run before layout loads.
+			// Role changes therefore apply on the user's next request.
+			event.locals.perms = await loadPermissions(db, session.user);
 		}
 	}
 

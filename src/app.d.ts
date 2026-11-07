@@ -1,3 +1,4 @@
+import type { Permission } from '#lib/permissions.ts';
 import type { AuthSession, AuthUser } from '#lib/server/auth-config.ts';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
@@ -8,7 +9,8 @@ declare global {
 		interface Locals {
 			user?: AuthUser;
 			session?: AuthSession;
-			// perms arrive in P0-05
+			/** Set with the session in hooks.server.ts (owner = everything) */
+			perms?: Set<Permission>;
 		}
 		// interface PageData {}
 		// interface PageState {}

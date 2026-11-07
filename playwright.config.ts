@@ -8,6 +8,8 @@ const local = /^http:\/\/(localhost|127\.0\.0\.1)/.test(baseURL);
 
 export default defineConfig({
 	testDir: './tests/e2e',
+	// Limited user + role on the dev branch for the permission tests
+	globalSetup: './tests/e2e/global-setup.ts',
 	workers: 1,
 	fullyParallel: false,
 	timeout: 60_000,

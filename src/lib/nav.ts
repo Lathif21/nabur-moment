@@ -1,6 +1,7 @@
 // Navigation for both shells. Client-safe. Labels are UI copy (Bahasa Indonesia).
 import type { Component } from 'svelte';
 import type { Path } from '$app/types';
+import type { ModuleKey } from './permissions.ts';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import SquareKanban from '@lucide/svelte/icons/square-kanban';
@@ -43,8 +44,8 @@ export type AdminNavItem = {
 	label: string;
 	href: Path;
 	icon: Icon;
-	/** Permission module (02-DATA-MODEL → Modules); the sidebar filters on it from P0-05 */
-	module: string;
+	/** Permission module; the item shows when the user can read it (`access` = owner only) */
+	module: ModuleKey;
 };
 
 export type AdminNavGroup = {
@@ -141,4 +142,16 @@ export function isActive(href: string, pathname: string): boolean {
 	const path = '/' + href;
 	if (href === 'admin') return pathname === '/admin' || pathname === '/admin/';
 	return pathname === path || pathname.startsWith(path + '/');
+}
+
+/** The sidebar a user sees: items whose module they can read (`access` only for the owner) */
+export function visibleAdminNav(perms: readonly string[]): AdminNavGroup[] {
+	return adminNav
+		.map((g) => ({ ...g, items: g.items.filter((i) => perms.includes(`${i.module}:read`)) }))
+		.filter((g) => g.items.length > 0);
+}
+
+/** Where to land when the Dashboard is not allowed; null when nothing is */
+export function firstAllowedHref(perms: readonly string[]): Path | null {
+	return adminNavItems.find((i) => perms.includes(`${i.module}:read`))?.href ?? null;
 }

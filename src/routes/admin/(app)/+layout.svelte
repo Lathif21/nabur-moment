@@ -25,7 +25,7 @@
 <!-- Guarded by +layout.server.ts (session; permissions from P0-05). Each page renders a PageHeader in page-body. -->
 <div class="min-h-dvh text-body lg:flex">
 	<aside class="sticky top-0 hidden h-dvh w-(--size-sidebar) shrink-0 lg:block">
-		<AdminNav user={data.user} />
+		<AdminNav user={data.user} perms={data.perms} />
 	</aside>
 
 	<header
@@ -57,7 +57,7 @@
 				>
 					<X size={20} strokeWidth={1.75} aria-hidden="true" />
 				</Dialog.Close>
-				<AdminNav user={data.user} onnavigate={() => (menuOpen = false)} />
+				<AdminNav user={data.user} perms={data.perms} onnavigate={() => (menuOpen = false)} />
 			</Dialog.Content>
 		</Dialog.Portal>
 	</Dialog.Root>
