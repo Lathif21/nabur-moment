@@ -5,3 +5,4 @@ export * from './auth.ts';
 export * from './access.ts';
 export * from './media.ts';
 export * from './cms.ts';
+export * from './crm.ts';
