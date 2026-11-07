@@ -73,3 +73,171 @@ export const clientFilterSchema = z.object({
 	sourceId: z.uuid().nullable().catch(null),
 	archived: z.boolean().catch(false)
 });
+
+// ---------- Bookings (P2-03) ----------
+
+const EVENT_TYPE_KEYS = [
+	'wedding',
+	'akad',
+	'resepsi',
+	'lamaran',
+	'engagement',
+	'prewedding',
+	'other'
+] as const;
+const STAGE_KEYS = [
+	'inquiry',
+	'consultation',
+	'quotation',
+	'booked',
+	'preparation',
+	'event_day',
+	'editing',
+	'completed',
+	'lost'
+] as const;
+/** A new booking can only start before Booked: Booked needs a paid DP */
+const OPEN_STAGE_KEYS = ['inquiry', 'consultation', 'quotation'] as const;
+
+const time = z
+	.string()
+	.trim()
+	.default('')
+	.refine((v) => v === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(v), 'Jam tidak valid (JJ:MM).')
+	.transform((v) => v || null);
+
+const isoDate = z
+	.string()
+	.trim()
+	.default('')
+	.refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Tanggal tidak valid.')
+	.transform((v) => v || null);
+
+export const sessionInputSchema = z
+	.object({
+		eventType: z.enum(EVENT_TYPE_KEYS, 'Pilih jenis sesi.'),
+		date: isoDate,
+		startTime: time,
+		endTime: time,
+		venue: optionalText(200),
+		city: optionalText(80),
+		notes: optionalText(500)
+	})
+	.refine((s) => !s.startTime || !s.endTime || s.startTime < s.endTime, {
+		message: 'Jam selesai harus setelah jam mulai.',
+		path: ['endTime']
+	});
+
+export const addonLineSchema = z.object({
+	addonId: z.uuid().nullable().default(null),
+	name: z.string().trim().min(1, 'Nama add-on wajib diisi.').max(120),
+	unitPrice: z.number().int().min(0).max(10_000_000_000),
+	qty: z.number().int().min(1, 'Jumlah minimal 1.').max(99)
+});
+
+/** JSON posted in a hidden field (sessions / add-on rows) */
+const jsonArray = <T extends z.ZodType>(item: T) =>
+	z
+		.string()
+		.default('[]')
+		.transform((v, ctx) => {
+			try {
+				return JSON.parse(v) as unknown;
+			} catch {
+				ctx.addIssue({ code: 'custom', message: 'Data tidak valid.' });
+				return z.NEVER;
+			}
+		})
+		.pipe(z.array(item));
+
+export const bookingSchema = z
+	.object({
+		clientId: z
+			.string()
+			.default('')
+			.transform((v) => v || null)
+			.pipe(z.uuid().nullable()),
+		/** Inline new client (used when clientId is empty) */
+		newClientName: optionalText(120),
+		newClientPhone: z
+			.string()
+			.trim()
+			.max(30)
+			.default('')
+			.transform((v, ctx) => {
+				if (!v) return null;
+				const n = phoneNormalize(v);
+				if (!n) {
+					ctx.addIssue({ code: 'custom', message: 'Nomor WhatsApp tidak valid.' });
+					return z.NEVER;
+				}
+				return n;
+			}),
+		title: z.string().trim().min(1, 'Judul wajib diisi.').max(160),
+		eventType: z.enum(EVENT_TYPE_KEYS, 'Pilih jenis acara.'),
+		stage: z.enum(OPEN_STAGE_KEYS).default('inquiry'),
+		packageId: z
+			.string()
+			.default('')
+			.transform((v) => v || null)
+			.pipe(z.uuid().nullable()),
+		agreedPrice: z.coerce
+			.number('Harga tidak valid.')
+			.int('Harga tidak valid.')
+			.min(0, 'Harga tidak boleh negatif.')
+			.max(10_000_000_000),
+		notes: optionalText(4000),
+		sessions: jsonArray(sessionInputSchema).refine(
+			(s) => s.length >= 1,
+			'Tambahkan minimal satu sesi.'
+		),
+		addons: jsonArray(addonLineSchema)
+	})
+	.superRefine((v, ctx) => {
+		if (!v.clientId && !v.newClientName)
+			ctx.addIssue({
+				code: 'custom',
+				path: ['clientId'],
+				message: 'Pilih klien atau isi klien baru.'
+			});
+	});
+
+export type BookingInput = z.output<typeof bookingSchema>;
+export type SessionInput = z.output<typeof sessionInputSchema>;
+
+export const bookingMoveSchema = z.object({
+	id: z.uuid(),
+	to: z.enum(STAGE_KEYS),
+	beforeId: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable()),
+	afterId: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable()),
+	lostReason: optionalText(500),
+	/** Selesai with an outstanding balance: the person confirmed the warning */
+	confirmBalance: z
+		.string()
+		.default('')
+		.transform((v) => v === 'yes')
+});
+
+export type BookingMoveInput = z.output<typeof bookingMoveSchema>;
+
+/** List filters from the URL: ?q=…&tahap=…&jenis=…&bulan=yyyy-MM */
+export const bookingFilterSchema = z.object({
+	q: z.string().trim().max(100).catch(''),
+	stage: z.enum(STAGE_KEYS).nullable().catch(null),
+	eventType: z.enum(EVENT_TYPE_KEYS).nullable().catch(null),
+	month: z
+		.string()
+		.regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+		.nullable()
+		.catch(null)
+});
+
+export type BookingFilter = z.output<typeof bookingFilterSchema>;
