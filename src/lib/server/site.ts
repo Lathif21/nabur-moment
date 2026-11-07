@@ -2,7 +2,7 @@
 // may read Halaman. Previews are never cached (docs/04-ARCHITECTURE.md → CMS content flow).
 import type { RequestEvent } from '@sveltejs/kit';
 import type { ListKey } from '#lib/cms/lists.ts';
-import type { PageKey } from '#lib/cms/sections.ts';
+import { PAGE_BY_KEY, type PageKey } from '#lib/cms/sections.ts';
 import type { MediaItem } from '#lib/media/types.ts';
 import { can } from '#lib/permissions.ts';
 import { db } from './db/index.ts';
@@ -11,6 +11,24 @@ import { listMediaIds, readList } from './services/cms-lists.ts';
 import { pageMediaIds, readPage } from './services/cms-pages.ts';
 import { mediaByIds } from './services/media.ts';
 import { storage } from './storage/index.ts';
+
+/** Per-page SEO; empty fields fall back to Pengaturan → Situs in the (site) layout */
+export type PageMeta = { title: string; description: string; image: string; noindex?: boolean };
+
+function pageMeta(
+	page: PageKey,
+	sections: Record<string, { data: Record<string, unknown> }>,
+	media: Record<string, MediaItem>
+): PageMeta {
+	const seo = sections.seo?.data ?? {};
+	const image = typeof seo.image === 'string' ? media[seo.image]?.src : undefined;
+	return {
+		// Beranda uses the site title as is; other pages fall back to their name
+		title: String(seo.title || (page === 'home' ? '' : (PAGE_BY_KEY.get(page)?.label ?? ''))),
+		description: String(seo.description || ''),
+		image: image ?? ''
+	};
+}
 
 export function isPreview({ url, locals }: Pick<RequestEvent, 'url' | 'locals'>) {
 	return (
@@ -28,7 +46,7 @@ export async function loadPublicPage(event: Pick<RequestEvent, 'url' | 'locals'>
 			media[m.id] = toMediaItem(m, storage);
 		}
 	}
-	return { preview, sections, media };
+	return { preview, sections, media, meta: pageMeta(page, sections, media) };
 }
 
 /** A CMS list for a public page: published snapshot, or the working copy in preview */

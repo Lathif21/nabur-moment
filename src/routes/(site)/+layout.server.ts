@@ -1,6 +1,7 @@
 import { mediaRefs } from '#lib/cms/sections.ts';
 import { SITE_SETTINGS } from '#lib/cms/site-settings.ts';
 import type { MediaItem } from '#lib/media/types.ts';
+import { PUBLIC_SITE_URL } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import { toMediaItem } from '#lib/server/media-view.ts';
 import { mediaByIds } from '#lib/server/services/media.ts';
@@ -33,5 +34,7 @@ export const load: LayoutServerLoad = async (event) => {
 		const ids = mediaRefs(SITE_SETTINGS, site).map((r) => r.mediaId);
 		for (const m of await mediaByIds(db, ids)) siteMedia[m.id] = toMediaItem(m, storage);
 	}
-	return { site, siteMedia, preview };
+	// Canonical / og:url base: the real domain once set, else this deployment's origin
+	const origin = (PUBLIC_SITE_URL || event.url.origin).replace(/\/$/, '');
+	return { site, siteMedia, preview, origin };
 };

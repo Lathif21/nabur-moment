@@ -69,7 +69,7 @@ export const EMPTY: ListSnapshots = {
 /** Public paths that show each list (revalidated after Terbitkan) */
 export const LIST_PATHS: Record<ListKey, string[]> = {
 	// Album pages are added per slug at publish time
-	portfolio: ['portofolio', ''],
+	portfolio: ['portofolio', '', 'sitemap.xml'],
 	packages: ['paket', ''],
 	testimonials: [''],
 	faq: ['faq']

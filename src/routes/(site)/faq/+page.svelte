@@ -12,10 +12,6 @@
 		typeof id === 'string' ? data.media[id] : undefined;
 </script>
 
-<svelte:head>
-	<title>FAQ · {data.site.businessName}</title>
-</svelte:head>
-
 <section class="border-t border-sage section-pad">
 	<div class="mx-auto flex max-w-3xl flex-col gap-12">
 		<header class="flex flex-col gap-4 text-center">

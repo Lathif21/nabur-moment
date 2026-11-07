@@ -13,10 +13,6 @@
 	const shown = $derived(active ? data.albums.filter((a) => a.eventType === active) : data.albums);
 </script>
 
-<svelte:head>
-	<title>Portofolio · {data.site.businessName}</title>
-</svelte:head>
-
 <section class="border-t border-sage section-pad">
 	<div class="mx-auto flex max-w-6xl flex-col gap-10 px-0">
 		{#if intro.visible}

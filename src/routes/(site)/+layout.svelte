@@ -18,19 +18,33 @@
 	const logoLight = $derived(src(site.logoLight));
 	const logoDark = $derived(src(site.logoDark));
 	const shareImage = $derived(src(site.shareImage));
+
+	// Page meta (CMS SEO card, album, …) over the site defaults (Pengaturan → Situs)
+	type Meta = { title: string; description: string; image: string; noindex?: boolean };
+	const meta = $derived((page.data.meta ?? {}) as Partial<Meta>);
+	const title = $derived(meta.title ? `${meta.title} · ${site.businessName}` : site.seoTitle);
+	const description = $derived(meta.description || site.seoDescription);
+	const image = $derived(meta.image || shareImage);
+	const canonical = $derived(data.origin + page.url.pathname);
 </script>
 
-<!-- Site-wide defaults from published settings; pages add their own title (per-page SEO in P1-09) -->
+<!-- One place for every public page's title, description, canonical and share preview (P1-09) -->
 <svelte:head>
-	<meta name="description" content={site.seoDescription} />
+	<title>{title}</title>
+	<meta name="description" content={description} />
+	<link rel="canonical" href={canonical} />
+	{#if meta.noindex || preview}<meta name="robots" content="noindex" />{/if}
 	<meta property="og:site_name" content={site.businessName} />
 	<meta property="og:type" content="website" />
 	<meta property="og:locale" content="id_ID" />
-	<meta property="og:title" content={site.seoTitle} />
-	<meta property="og:description" content={site.seoDescription} />
-	{#if shareImage}
-		<meta property="og:image" content={shareImage} />
+	<meta property="og:url" content={canonical} />
+	<meta property="og:title" content={title} />
+	<meta property="og:description" content={description} />
+	{#if image}
+		<meta property="og:image" content={image} />
 		<meta name="twitter:card" content="summary_large_image" />
+	{:else}
+		<meta name="twitter:card" content="summary" />
 	{/if}
 </svelte:head>
 

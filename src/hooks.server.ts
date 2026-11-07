@@ -24,5 +24,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	return svelteKitHandler({ event, resolve, auth, building });
+	const response = await svelteKitHandler({ event, resolve, auth, building });
+	// The admin is never indexed, whatever a crawler finds
+	if (pathname.startsWith('/admin')) {
+		try {
+			response.headers.set('x-robots-tag', 'noindex, nofollow');
+		} catch {
+			// immutable headers (e.g. a native redirect): the page itself has the robots meta
+		}
+	}
+	return response;
 };

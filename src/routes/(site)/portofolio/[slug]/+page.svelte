@@ -42,11 +42,6 @@
 	);
 </script>
 
-<svelte:head>
-	<title>{album.title} · Portofolio · {data.site.businessName}</title>
-	<meta name="description" content={album.story.slice(0, 160) || data.site.seoDescription} />
-</svelte:head>
-
 <article>
 	<header
 		class="relative isolate flex min-h-[70svh] items-end overflow-hidden bg-forest text-cream"

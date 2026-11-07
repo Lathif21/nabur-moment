@@ -4,10 +4,6 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head>
-	<title>{data.title} · {data.site.businessName}</title>
-</svelte:head>
-
 <section class="border-t border-sage section-pad">
 	<div class="mx-auto flex max-w-[60ch] flex-col items-center gap-5 text-center">
 		<p class="eyebrow text-olive">Segera hadir</p>

@@ -10,10 +10,6 @@
 </script>
 
 <!-- Paket from the CMS: intro + published packages / add-ons + notes. P1-06 adds the full design. -->
-<svelte:head>
-	<title>Paket · {data.site.businessName}</title>
-</svelte:head>
-
 <section class="border-t border-sage section-pad">
 	<div class="mx-auto flex max-w-6xl flex-col gap-14">
 		{#if intro.visible}

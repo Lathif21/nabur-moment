@@ -22,10 +22,6 @@
 	const describedBy = (k: string) => (fields[k] ? `${k}-error` : undefined);
 </script>
 
-<svelte:head>
-	<title>Booking · {data.site.businessName}</title>
-</svelte:head>
-
 <section class="border-t border-sage section-pad">
 	<div class="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-20">
 		<header class="flex flex-col gap-5">

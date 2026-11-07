@@ -44,10 +44,6 @@
 	);
 </script>
 
-<svelte:head>
-	<title>{data.site.seoTitle}</title>
-</svelte:head>
-
 {#if s.hero.visible}
 	<Hero
 		media={heroMedia}

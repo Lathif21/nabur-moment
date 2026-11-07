@@ -158,7 +158,7 @@ const introFields: Field[] = [
 export const PAGE_KEYS = ['home', 'about', 'packages', 'faq', 'portfolio', 'inquiry'] as const;
 export type PageKey = (typeof PAGE_KEYS)[number];
 
-export const PAGES: PageDef[] = [
+const BASE_PAGES: PageDef[] = [
 	{
 		key: 'home',
 		label: 'Beranda',
@@ -501,6 +501,29 @@ export const PAGES: PageDef[] = [
 		]
 	}
 ];
+
+/** Last card on every page: search and share preview; empty fields fall back to Pengaturan → Situs */
+export const SEO_SECTION: SectionDef = {
+	key: 'seo',
+	label: 'SEO & bagikan',
+	description: 'Kosongkan untuk memakai judul, deskripsi, dan gambar bawaan dari Pengaturan situs.',
+	fields: [
+		{ kind: 'text', key: 'title', label: 'Judul halaman (SEO)', max: 70 },
+		{ kind: 'textarea', key: 'description', label: 'Deskripsi (SEO)', max: 160 },
+		{
+			kind: 'image',
+			key: 'image',
+			label: 'Gambar saat dibagikan',
+			hint: 'Ideal 1200 × 630.'
+		}
+	],
+	defaults: { title: '', description: '', image: null }
+};
+
+export const PAGES: PageDef[] = BASE_PAGES.map((p) => ({
+	...p,
+	sections: [...p.sections, SEO_SECTION]
+}));
 
 export const PAGE_BY_KEY = new Map(PAGES.map((p) => [p.key, p]));
 

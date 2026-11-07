@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import type { PageMeta } from '#lib/server/site.ts';
 import { loadAlbum } from '#lib/server/site.ts';
 import type { PageServerLoad } from './$types';
 
@@ -7,5 +8,11 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
 	const found = await loadAlbum(event, event.params.slug);
 	if (!found) error(404, 'Album tidak ditemukan');
-	return found;
+	const { album, media } = found;
+	const meta: PageMeta = {
+		title: album.title,
+		description: album.story.replace(/\s+/g, ' ').slice(0, 160),
+		image: (album.cover && media[album.cover]?.src) || ''
+	};
+	return { ...found, meta };
 };

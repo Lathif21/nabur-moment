@@ -19,10 +19,6 @@
 	);
 </script>
 
-<svelte:head>
-	<title>Tentang · {data.site.businessName}</title>
-</svelte:head>
-
 {#if s.hero.visible}
 	<PageHero title={s.hero.data.title as string} image={m(s.hero.data.image)} eyebrow="Tentang" />
 {:else}
