@@ -304,6 +304,48 @@
 			border-color: var(--color-danger);
 		}
 	}
+
+	/* Admin tables: scroll sideways inside the card on phones */
+	.table-wrap {
+		overflow-x: auto;
+	}
+	.table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-body);
+		& th {
+			border-bottom: 1px solid var(--color-line);
+			padding: 0.625rem 0.75rem;
+			text-align: left;
+			font-size: var(--text-small);
+			font-weight: 600;
+			color: var(--color-ink-2);
+			white-space: nowrap;
+		}
+		& td,
+		& tbody th {
+			border-bottom: 1px solid color-mix(in srgb, var(--color-line) 50%, transparent);
+			padding: 0.625rem 0.75rem;
+			vertical-align: middle;
+		}
+		/* Row headers read like cells */
+		& tbody th[scope='row'] {
+			font-weight: 400;
+			color: var(--color-ink);
+			white-space: normal;
+		}
+		& tbody:last-child tr:last-child :is(td, th) {
+			border-bottom: 0;
+		}
+	}
+
+	/* Native checkbox in brand colour, 20 px, with the focus ring from base */
+	.checkbox {
+		width: 1.25rem;
+		height: 1.25rem;
+		accent-color: var(--color-olive);
+		cursor: pointer;
+	}
 }
 
 /* Admin page content column: 16 → 32 px padding, max 1280 px */

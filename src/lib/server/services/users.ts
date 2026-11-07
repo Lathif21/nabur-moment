@@ -2,9 +2,9 @@
 // the owner adds people in Akses & Peran → Pengguna (P0-06) or with the script.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { hashPassword } from 'better-auth/crypto';
-import { eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
-import { account, user } from '../db/schema/index.ts';
+import { account, role, session, user, userRole } from '../db/schema/index.ts';
 import { ServiceError } from './errors.ts';
 
 export const MIN_PASSWORD = 8;
@@ -60,4 +60,66 @@ export async function createUser(
 export async function isActiveUser(db: DbOrTx, userId: string) {
 	const [row] = await db.select({ active: user.active }).from(user).where(eq(user.id, userId));
 	return row?.active === true;
+}
+
+/** Akses & Peran → Pengguna: owner first, then by name; each with their roles */
+export async function listUsers(db: DbOrTx) {
+	const [rows, links] = await Promise.all([
+		db
+			.select({
+				id: user.id,
+				name: user.name,
+				email: user.email,
+				isOwner: user.isOwner,
+				active: user.active,
+				createdAt: user.createdAt
+			})
+			.from(user)
+			.orderBy(desc(user.isOwner), asc(user.name)),
+		db
+			.select({ userId: userRole.userId, id: role.id, name: role.name })
+			.from(userRole)
+			.innerJoin(role, eq(role.id, userRole.roleId))
+			.orderBy(asc(role.name))
+	]);
+	return rows.map((u) => ({
+		...u,
+		roles: links.filter((l) => l.userId === u.id).map(({ id, name }) => ({ id, name }))
+	}));
+}
+
+export type UserRow = Awaited<ReturnType<typeof listUsers>>[number];
+
+/**
+ * New password for a user (generated when empty). Their open sessions end, so the old password
+ * cannot linger on another device. Returns the password so a generated one can be shown once.
+ */
+export async function resetPassword(db: DbOrTx, userId: string, newPassword?: string) {
+	const password = newPassword || generatePassword();
+	if (password.length < MIN_PASSWORD)
+		throw new ServiceError(`Kata sandi minimal ${MIN_PASSWORD} karakter.`, 'password');
+	const hash = await hashPassword(password);
+	return db.transaction(async (tx) => {
+		const [u] = await tx
+			.select({ id: user.id, name: user.name, email: user.email })
+			.from(user)
+			.where(eq(user.id, userId));
+		if (!u) throw new ServiceError('Pengguna tidak ditemukan.');
+		const updated = await tx
+			.update(account)
+			.set({ password: hash })
+			.where(and(eq(account.userId, userId), eq(account.providerId, 'credential')))
+			.returning({ id: account.id });
+		if (!updated.length) {
+			await tx.insert(account).values({
+				id: randomUUID(),
+				userId,
+				accountId: userId,
+				providerId: 'credential',
+				password: hash
+			});
+		}
+		await tx.delete(session).where(eq(session.userId, userId));
+		return { name: u.name, email: u.email, password, generated: !newPassword };
+	});
 }

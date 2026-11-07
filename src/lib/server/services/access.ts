@@ -10,6 +10,7 @@ import {
 import type { DbOrTx } from '../db/client.ts';
 import { role, rolePermission, session, user, userRole } from '../db/schema/index.ts';
 import { ServiceError } from './errors.ts';
+import { createUser } from './users.ts';
 
 /** The permission set of one user (owner = everything). Loaded once per admin request. */
 export async function loadPermissions(
@@ -153,3 +154,27 @@ export async function setUserActive(db: DbOrTx, userId: string, active: boolean)
  * `is_owner`, and users are deactivated, not deleted. Changing the owner is a script-only
  * operation on the database.
  */
+
+/** Akses & Peran → Tambah pengguna: the login and its roles in one transaction */
+export async function addUser(
+	db: DbOrTx,
+	input: { name: string; email: string; password?: string; roleIds: string[] }
+) {
+	return db.transaction(async (tx) => {
+		const made = await createUser(tx, input);
+		await setUserRoles(tx, made.id, input.roleIds);
+		return made;
+	});
+}
+
+/** Role editor "Simpan": name, description and matrix together */
+export async function saveRole(
+	db: DbOrTx,
+	id: string,
+	input: { name: string; description?: string; grants: { module: string; action: CrudAction }[] }
+) {
+	return db.transaction(async (tx) => {
+		await updateRole(tx, id, input);
+		return setRolePermissions(tx, id, input.grants);
+	});
+}
