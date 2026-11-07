@@ -1,26 +1,26 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import Hero from '#lib/components/site/sections/Hero.svelte';
 </script>
 
-<!-- Placeholder Beranda until the CMS-driven sections (P1-06). Shows the type and colour system. -->
+<!-- Placeholder Beranda until the CMS-driven sections (P1-06). The hero clip is a free stock video
+     (Mixkit #5223, Mixkit Stock Video Free License) until she uploads her own. -->
 <svelte:head>
 	<title>Nabur Moment</title>
 	<meta name="description" content="Wedding content creator. Situs sedang disiapkan." />
 </svelte:head>
 
-<section
-	class="relative flex min-h-[92dvh] flex-col items-center justify-center bg-forest px-5 pt-24 pb-16 text-center text-cream"
->
-	<p class="font-script text-script text-cream/90">Cerita kita</p>
-	<h1 class="-mt-4 font-display text-display lg:-mt-8">
-		Momen yang <em>tak terulang</em>
-	</h1>
-	<p class="mt-6 eyebrow">Wedding content creator</p>
-	<p class="absolute bottom-8 text-caption tracking-[0.16em] uppercase" aria-hidden="true">Gulir</p>
-</section>
+<Hero
+	media={{ kind: 'video', src: asset('media/hero.mp4'), poster: asset('media/hero-poster.webp') }}
+	script="Cerita kita"
+	headline="Momen yang"
+	accent="tak terulang"
+	caption="Wedding content creator"
+	next="lanjut"
+/>
 
-<section class="section-pad">
+<section id="lanjut" class="scroll-mt-4 section-pad">
 	<div class="mx-auto flex max-w-[60ch] flex-col items-center gap-6 text-center">
 		<p class="eyebrow text-olive">Segera hadir</p>
 		<h2 class="font-display text-h2">Situs kami sedang <em>disiapkan</em></h2>
