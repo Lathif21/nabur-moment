@@ -70,6 +70,7 @@ Goal: an empty but deployed, branded app; the owner can log in and manage access
 - Vercel project (`sin1`) and Neon on Lathif's accounts, credentials in `.env` + Vercel env vars, production branch migrated, owner created
 - Domain + HTTPS: **naburmoment.com** (tentative; confirm and buy before this task), `www` redirects to the apex
 - **Done when:** production URL serves the login and the empty site.
+- **Status (7 Nov 2026):** Vercel project `nabur-moment` (team befisien, `sin1`) deployed by CLI to https://nabur-moment.vercel.app; env vars set (production = Neon `production`, preview = `dev`). Open: migrate the `production` branch, create the real owner, connect the GitHub repo, domain (Q13).
 
 ---
 
