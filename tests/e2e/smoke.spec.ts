@@ -31,8 +31,8 @@ test('home page renders in Bahasa Indonesia', async ({ page }) => {
 });
 
 test('public nav routes to placeholders, unknown paths are 404', async ({ page }) => {
-	await page.goto('/tentang');
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tentang');
+	await page.goto('/booking');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Booking');
 	const res = await page.goto('/tidak-ada');
 	expect(res?.status()).toBe(404);
 });

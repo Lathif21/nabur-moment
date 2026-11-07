@@ -24,7 +24,7 @@
 				{#if intro.data.eyebrow}<p class="eyebrow text-olive">{intro.data.eyebrow}</p>{/if}
 				<h1 class="font-display text-h1">{intro.data.headline}</h1>
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised on save (cms-pages.ts) -->
-				<div class="text-lead">{@html intro.data.body}</div>
+				<div class="prose-site text-lead">{@html intro.data.body}</div>
 			</header>
 		{:else}
 			<h1 class="text-center font-display text-h1">Portofolio</h1>

@@ -77,3 +77,19 @@ export async function loadAlbum(event: Pick<RequestEvent, 'url' | 'locals'>, slu
 	}
 	return { album, others, media };
 }
+
+/** Beranda "featured": the first `count` published albums flagged featured, covers only */
+export async function loadFeaturedAlbums(
+	event: Pick<RequestEvent, 'url' | 'locals'>,
+	count: number
+) {
+	const albums = (await readList(db, 'portfolio', { preview: isPreview(event) }))
+		.filter((a) => a.featured)
+		.slice(0, count);
+	const media: Record<string, MediaItem> = {};
+	if (storage) {
+		const covers = albums.map((a) => a.cover).filter((v): v is string => !!v);
+		for (const m of await mediaByIds(db, covers)) media[m.id] = toMediaItem(m, storage);
+	}
+	return { albums, media };
+}

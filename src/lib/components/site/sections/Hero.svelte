@@ -2,6 +2,10 @@
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import { MediaQuery } from 'svelte/reactivity';
+	// The hero text fonts, preloaded so the first screen does not wait for the CSS to find them
+	import pinyon from '@fontsource/pinyon-script/files/pinyon-script-latin-400-normal.woff2?url';
+	import playfair from '@fontsource/playfair-display/files/playfair-display-latin-400-normal.woff2?url';
+	import playfairItalic from '@fontsource/playfair-display/files/playfair-display-latin-400-italic.woff2?url';
 
 	// Props mirror the CMS `hero` section (03-SCREENS → Beranda #1).
 	export type HeroMedia =
@@ -36,20 +40,56 @@
 	const reducedMotion = new MediaQuery('prefers-reduced-motion: reduce');
 	let video = $state<HTMLVideoElement>();
 	let paused = $state(true);
+	/**
+	 * The clip's URL is set only after the page has loaded: the poster paints first and the video
+	 * never competes with the page for bandwidth. Reduced motion or data saver: no download at all.
+	 */
+	let videoSrc = $state<string | undefined>();
 
-	// No autoplay attribute: the clip only starts once we know motion is welcome (WCAG 2.3.3)
+	function wantsMotion() {
+		const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+			?.saveData;
+		return !reducedMotion.current && !saveData;
+	}
+
 	$effect(() => {
-		if (!video) return;
+		if (media.kind !== 'video' || videoSrc || !wantsMotion()) return;
+		const src = media.src;
+		const start = () => (videoSrc = src);
+		if (document.readyState === 'complete') start();
+		else {
+			addEventListener('load', start, { once: true });
+			return () => removeEventListener('load', start);
+		}
+	});
+
+	// No autoplay attribute: the clip only plays once we know motion is welcome (WCAG 2.3.3)
+	$effect(() => {
+		if (!video || !videoSrc) return;
 		if (reducedMotion.current) video.pause();
 		else video.play().catch(() => (paused = true));
 	});
 
 	function toggle() {
 		if (!video) return;
-		if (video.paused) video.play();
+		if (!videoSrc && media.kind === 'video') {
+			// Not loaded yet (reduced motion / data saver): load it; the effect above plays it
+			videoSrc = media.src;
+			return;
+		}
+		if (video.paused) video.play().catch(() => (paused = true));
 		else video.pause();
 	}
 </script>
+
+<svelte:head>
+	{#each [pinyon, playfair, playfairItalic] as href (href)}
+		<link rel="preload" as="font" type="font/woff2" crossorigin="anonymous" {href} />
+	{/each}
+	{#if media.kind === 'video' && media.poster}
+		<link rel="preload" as="image" href={media.poster} fetchpriority="high" />
+	{/if}
+</svelte:head>
 
 <section
 	class="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden bg-forest px-5 pt-24 pb-28 text-center text-cream"
@@ -58,12 +98,12 @@
 		<video
 			bind:this={video}
 			class={['hero-media', mono && 'hero-media--mono']}
-			src={media.src}
+			src={videoSrc}
 			poster={media.poster ?? undefined}
 			muted
 			loop
 			playsinline
-			preload="auto"
+			preload="none"
 			disablepictureinpicture
 			aria-hidden="true"
 			tabindex="-1"
@@ -167,9 +207,9 @@
 		transform-origin: top;
 		animation: hero-cue 2.4s ease-in-out infinite;
 	}
+	/* Movement only: starting from opacity 0 would hold back the largest paint (LCP) */
 	@keyframes hero-rise {
 		from {
-			opacity: 0;
 			translate: 0 16px;
 		}
 	}

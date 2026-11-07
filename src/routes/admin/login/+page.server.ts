@@ -3,6 +3,7 @@ import { resolve } from '$app/paths';
 import { APIError } from 'better-auth/api';
 import { INACTIVE_MESSAGE } from '#lib/server/auth-config.ts';
 import { auth } from '#lib/server/auth.ts';
+import { setIsrBypass } from '#lib/server/isr.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -10,7 +11,7 @@ export const load: PageServerLoad = ({ locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request }) => {
+	default: async ({ request, cookies }) => {
 		const form = await request.formData();
 		const email = String(form.get('email') ?? '').trim();
 		const password = String(form.get('password') ?? '');
@@ -35,6 +36,7 @@ export const actions: Actions = {
 			throw e;
 		}
 
+		setIsrBypass(cookies);
 		redirect(303, resolve('admin'));
 	}
 };

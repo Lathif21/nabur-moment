@@ -123,6 +123,21 @@
 	text-transform: uppercase;
 }
 
+/* CMS rich text on the site (p, br, strong, em, a only; sanitised on save) */
+@utility prose-site {
+	& p + p {
+		margin-top: 1em;
+	}
+	& a {
+		color: var(--color-olive);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	& strong {
+		font-weight: 600;
+	}
+}
+
 /* Section rhythm: 64 px on phones, 96 → 160 px on desktop */
 @utility section-pad {
 	padding-block: 4rem;

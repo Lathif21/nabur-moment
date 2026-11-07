@@ -86,6 +86,7 @@ test('FAQ: create, reorder, hide, then Terbitkan', async ({ page, browser }) => 
 	await expect(page.getByText('FAQ diterbitkan.')).toBeVisible();
 
 	await visitor.goto('/faq');
-	await expect(visitor.locator('summary').filter({ hasText: run })).toHaveText([q('C'), q('B')]);
+	// FAQ accordion: one trigger button per published question, in order
+	await expect(visitor.getByRole('button').filter({ hasText: run })).toHaveText([q('C'), q('B')]);
 	await visitor.close();
 });
