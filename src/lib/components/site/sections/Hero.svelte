@@ -77,7 +77,10 @@
 			<p class="font-script text-script text-cream/90">{script}</p>
 		{/if}
 		<h1 class={['font-display text-display', script && '-mt-3 lg:-mt-7']}>
-			{headline}{#if accent}{' '}<em>{accent}</em>{/if}
+			{headline}
+			{#if accent}
+				<em>{accent}</em>
+			{/if}
 		</h1>
 		{#if caption}
 			<p class="mt-6 eyebrow text-cream/90">{caption}</p>
