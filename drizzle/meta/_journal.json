@@ -57,6 +57,13 @@
       "when": 1794085177799,
       "tag": "0007_cms_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794086615587,
+      "tag": "0008_portfolio",
+      "breakpoints": true
     }
   ]
 }
