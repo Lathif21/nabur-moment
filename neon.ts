@@ -4,8 +4,12 @@ import { defineConfig } from '@neon/config/v1';
 // branches `production` (default) and `dev` (local + preview deploys).
 export default defineConfig({
 	auth: false,
-	// Buckets (site-media, private-files) are declared in P1-01.
-	buckets: {},
+	buckets: {
+		// Images, videos and posters shown on the public site: anyone can read, only the app writes
+		'site-media': { access: 'public_read' },
+		// Payment proofs, receipts: always private; downloads go through a permission-checked route
+		'private-files': {}
+	},
 	branch: (branch) => {
 		if (branch.isDefault) return {};
 		// Long-lived development branch (local `npm run dev`, preview deploys, demo seed)

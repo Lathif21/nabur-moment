@@ -18,7 +18,8 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
-		"user:create": "tsx scripts/create-user.ts"
+		"user:create": "tsx scripts/create-user.ts",
+		"storage:cors": "tsx scripts/storage-cors.ts"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.ts",
@@ -51,6 +52,8 @@
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.1164.0",
+		"@aws-sdk/s3-request-presigner": "^3.1164.0",
 		"@date-fns/tz": "^1.5.0",
 		"@fontsource/open-sans": "^5.3.0",
 		"@fontsource/pinyon-script": "^5.3.0",

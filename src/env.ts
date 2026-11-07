@@ -48,6 +48,17 @@ export const variables = defineEnvVars({
 		description: 'Bucket for private files (payment proofs, receipts), e.g. `private-files`',
 		schema: optional
 	},
+	// Local fallback: `neon config apply` / `neon env pull` write the AWS_* names into .env
+	AWS_ACCESS_KEY_ID: {
+		description: 'Local only: see NEON_STORAGE_ACCESS_KEY_ID',
+		schema: optional
+	},
+	AWS_SECRET_ACCESS_KEY: {
+		description: 'Local only: see NEON_STORAGE_SECRET_ACCESS_KEY',
+		schema: optional
+	},
+	AWS_ENDPOINT_URL_S3: { description: 'Local only: see NEON_STORAGE_ENDPOINT', schema: optional },
+	AWS_REGION: { description: 'Local only: see NEON_STORAGE_REGION', schema: optional },
 	CRON_SECRET: {
 		description: 'Vercel Cron sends it as `Authorization: Bearer …`; cron routes check it',
 		schema: optional
