@@ -9,11 +9,21 @@
 		description?: string;
 		children: Snippet;
 		footer?: Snippet;
+		/** `xl` for pickers and galleries */
+		size?: 'md' | 'xl';
 		/** Called when the person dismisses it (X, Esc, overlay) */
 		onclose?: () => void;
 	};
 
-	let { open = $bindable(), title, description, children, footer, onclose }: Props = $props();
+	let {
+		open = $bindable(),
+		title,
+		description,
+		children,
+		footer,
+		onclose,
+		size = 'md'
+	}: Props = $props();
 </script>
 
 <!-- Centred dialog for decisions (DP belum lunas, Batal reason). Drawers are for create / edit forms. -->
@@ -26,7 +36,10 @@
 	<Dialog.Portal>
 		<Dialog.Overlay class="fixed inset-0 z-40 bg-forest/40" />
 		<Dialog.Content
-			class="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-card bg-surface shadow-modal"
+			class={[
+				'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-card bg-surface shadow-modal',
+				size === 'xl' ? 'h-[calc(100dvh-32px)] max-w-5xl' : 'max-w-lg'
+			]}
 		>
 			<div class="flex items-start gap-3 px-6 pt-5 pb-4">
 				<div class="min-w-0 flex-1">

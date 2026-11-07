@@ -8,6 +8,7 @@
 	import StatTile from '#lib/components/admin/StatTile.svelte';
 	import Field from '#lib/components/form/Field.svelte';
 	import MoneyInput from '#lib/components/form/MoneyInput.svelte';
+	import MediaPicker from '#lib/components/media/MediaPicker.svelte';
 	import { rupiah, rupiahShort } from '#lib/format.ts';
 	import { toast } from '#lib/toast.ts';
 
@@ -15,6 +16,8 @@
 	let modalOpen = $state(false);
 	let confirmOpen = $state(false);
 	let price = $state<number | null>(12_500_000);
+	let pickerOpen = $state(false);
+	let picked = $state<string[]>([]);
 </script>
 
 <!-- Component gallery for design review (P0-04). Not in the sidebar; remove before launch. -->
@@ -77,6 +80,16 @@
 		<p class="text-body">Latar kolom kanban (sage-20) dengan teks forest.</p>
 	</section>
 
+	<section class="card flex flex-col gap-3 p-5">
+		<h2 class="font-display text-section-title">Media picker</h2>
+		<button type="button" class="btn btn--secondary w-fit" onclick={() => (pickerOpen = true)}>
+			Pilih media
+		</button>
+		<p class="text-small">
+			Terpilih: <output data-testid="picked-ids">{picked.join(',') || '-'}</output>
+		</p>
+	</section>
+
 	<EmptyState message="Belum ada klien. Tambahkan klien pertama.">
 		{#snippet action()}
 			<button type="button" class="btn btn--primary">Tambah klien</button>
@@ -130,3 +143,5 @@
 >
 	Invoice <strong>INV/NM/2026/11/001</strong> akan dibatalkan (void) dan tidak bisa dipakai lagi.
 </ConfirmDialog>
+
+<MediaPicker bind:open={pickerOpen} multiple value={picked} onselect={(ids) => (picked = ids)} />
