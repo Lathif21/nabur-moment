@@ -14,7 +14,10 @@
 		"format": "prettier --write .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:studio": "drizzle-kit studio"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.ts",
@@ -28,6 +31,8 @@
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^24",
+		"@types/pg": "^8.23.1",
+		"drizzle-kit": "^0.31.11",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
@@ -38,6 +43,7 @@
 		"svelte": "^5.57.1",
 		"svelte-check": "^4.6.0",
 		"tailwindcss": "^4.3.0",
+		"tsx": "^4.23.15",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
 		"vite": "^8.3.0",
@@ -45,6 +51,10 @@
 	},
 	"dependencies": {
 		"@date-fns/tz": "^1.5.0",
-		"date-fns": "^4.4.0"
+		"@neon/config": "^1.13.0",
+		"@vercel/functions": "^3.11.0",
+		"date-fns": "^4.4.0",
+		"drizzle-orm": "^0.45.4",
+		"pg": "^8.23.1"
 	}
 }
