@@ -20,3 +20,27 @@ export function refreshThenToast(
 		};
 	};
 }
+
+/**
+ * Posts to a form action from code (drag-and-drop reorder), then reloads the page data.
+ * Returns the error message on failure.
+ */
+export async function postAction(
+	action: string,
+	fields: Record<string, string>
+): Promise<string | null> {
+	const { deserialize } = await import('$app/forms');
+	const { invalidateAll } = await import('$app/navigation');
+	const body = new FormData();
+	for (const [k, v] of Object.entries(fields)) body.set(k, v);
+	const res = await fetch(action, {
+		method: 'POST',
+		body,
+		headers: { accept: 'application/json', 'x-sveltekit-action': 'true' }
+	});
+	const result = deserialize(await res.text());
+	await invalidateAll();
+	if (result.type === 'failure') return String(result.data?.error ?? 'Gagal menyimpan.');
+	if (result.type === 'error') return 'Gagal menyimpan.';
+	return null;
+}
