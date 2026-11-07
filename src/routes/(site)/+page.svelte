@@ -1,24 +1,46 @@
 <script lang="ts">
 	import { asset, resolve } from '$app/paths';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
-	import Hero from '#lib/components/site/sections/Hero.svelte';
+	import Hero, { type HeroMedia } from '#lib/components/site/sections/Hero.svelte';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+
+	const hero = $derived(data.sections.hero);
+	const heroMedia = $derived.by((): HeroMedia => {
+		const m = hero.data.media ? data.media[hero.data.media as string] : undefined;
+		if (m?.kind === 'video') return { kind: 'video', src: m.src!, poster: m.poster };
+		if (m?.kind === 'image')
+			return {
+				kind: 'image',
+				src: m.src!,
+				srcset: m.srcset,
+				alt: m.alt,
+				focalX: m.focalX,
+				focalY: m.focalY
+			};
+		// Nothing chosen yet: the free stock clip (Mixkit #5223, see MEDIA-CREDITS.md)
+		return { kind: 'video', src: asset('media/hero.mp4'), poster: asset('media/hero-poster.webp') };
+	});
 </script>
 
-<!-- Placeholder Beranda until the CMS-driven sections (P1-06). The hero clip is a free stock video
-     (Mixkit #5223, Mixkit Stock Video Free License) until she uploads her own. -->
+<!-- Beranda from the CMS. Only the hero is rendered so far; the other sections arrive in P1-06. -->
 <svelte:head>
 	<title>Nabur Moment</title>
 	<meta name="description" content="Wedding content creator. Situs sedang disiapkan." />
 </svelte:head>
 
-<Hero
-	media={{ kind: 'video', src: asset('media/hero.mp4'), poster: asset('media/hero-poster.webp') }}
-	script="Cerita kita"
-	headline="Momen yang"
-	accent="tak terulang"
-	caption="Wedding content creator"
-	next="lanjut"
-/>
+{#if hero.visible}
+	<Hero
+		media={heroMedia}
+		script={hero.data.script as string}
+		headline={hero.data.headline as string}
+		accent={hero.data.accent as string}
+		caption={hero.data.caption as string}
+		mono={hero.data.tone !== 'color'}
+		next="lanjut"
+	/>
+{/if}
 
 <section id="lanjut" class="scroll-mt-4 section-pad">
 	<div class="mx-auto flex max-w-[60ch] flex-col items-center gap-6 text-center">

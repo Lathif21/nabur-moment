@@ -184,6 +184,36 @@ export async function createEmbed(db: DbOrTx, input: { url: string }, userId: st
 const usageCount = (db: DbOrTx) =>
 	db.$count(mediaUsage, eq(mediaUsage.mediaId, media.id)).as('usage');
 
+/** Columns the admin UI and the site need (see #lib/server/media-view.ts) */
+const columns = (db: DbOrTx) => ({
+	id: media.id,
+	kind: media.kind,
+	key: media.key,
+	variants: media.variants,
+	posterKey: media.posterKey,
+	filename: media.filename,
+	bytes: media.bytes,
+	width: media.width,
+	height: media.height,
+	durationS: media.durationS,
+	alt: media.alt,
+	focalX: media.focalX,
+	focalY: media.focalY,
+	embedProvider: media.embedProvider,
+	embedUrl: media.embedUrl,
+	createdAt: media.createdAt,
+	usage: usageCount(db)
+});
+
+/** Ready items by id (pages, sections, albums render them); unknown ids are skipped */
+export async function mediaByIds(db: DbOrTx, ids: string[]) {
+	if (!ids.length) return [];
+	return db
+		.select(columns(db))
+		.from(media)
+		.where(and(inArray(media.id, [...new Set(ids)]), eq(media.status, 'ready')));
+}
+
 /** The library grid: ready items, newest first, optionally one kind or only unused ones */
 export async function listMedia(
 	db: DbOrTx,
@@ -202,25 +232,7 @@ export async function listMedia(
 			)
 		);
 	return db
-		.select({
-			id: media.id,
-			kind: media.kind,
-			key: media.key,
-			variants: media.variants,
-			posterKey: media.posterKey,
-			filename: media.filename,
-			bytes: media.bytes,
-			width: media.width,
-			height: media.height,
-			durationS: media.durationS,
-			alt: media.alt,
-			focalX: media.focalX,
-			focalY: media.focalY,
-			embedProvider: media.embedProvider,
-			embedUrl: media.embedUrl,
-			createdAt: media.createdAt,
-			usage: usageCount(db)
-		})
+		.select(columns(db))
 		.from(media)
 		.where(and(...where))
 		.orderBy(desc(media.createdAt))

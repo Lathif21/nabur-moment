@@ -3,12 +3,21 @@
 	import Play from '@lucide/svelte/icons/play';
 	import { MediaQuery } from 'svelte/reactivity';
 
-	// Props mirror the CMS `hero` section (03-SCREENS → Beranda #1); P1-06 feeds them from the DB.
-	type Media =
-		{ kind: 'video'; src: string; poster: string } | { kind: 'image'; src: string; alt: string };
+	// Props mirror the CMS `hero` section (03-SCREENS → Beranda #1).
+	export type HeroMedia =
+		| { kind: 'video'; src: string; poster: string | null }
+		| {
+				kind: 'image';
+				src: string;
+				srcset?: string | null;
+				alt: string;
+				/** Focal point 0–1, keeps the subject in frame when cropped */
+				focalX?: number;
+				focalY?: number;
+		  };
 
 	type Props = {
-		media: Media;
+		media: HeroMedia;
 		/** Script accent above the headline, 1–3 words */
 		script?: string;
 		/** Serif headline; `accent` is appended in italic */
@@ -50,7 +59,7 @@
 			bind:this={video}
 			class={['hero-media', mono && 'hero-media--mono']}
 			src={media.src}
-			poster={media.poster}
+			poster={media.poster ?? undefined}
 			muted
 			loop
 			playsinline
@@ -65,8 +74,11 @@
 		<img
 			class={['hero-media', mono && 'hero-media--mono']}
 			src={media.src}
+			srcset={media.srcset ?? undefined}
+			sizes="100vw"
 			alt={media.alt}
 			fetchpriority="high"
+			style:object-position="{(media.focalX ?? 0.5) * 100}% {(media.focalY ?? 0.5) * 100}%"
 		/>
 	{/if}
 	<!-- Forest veil: darker at the top (header) and bottom (cue), lighter behind the words -->
