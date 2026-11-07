@@ -14,7 +14,7 @@ import {
 	pkg,
 	type PackageSnapshot
 } from '../db/schema/index.ts';
-import { BOOKED_STAGES, STAGE_LABEL, type Stage } from '../../crm.ts';
+import { BOOKED_STAGES, STAGE_LABEL, type EventType, type Stage } from '../../crm.ts';
 import { dayKeyWib, rupiah } from '../../format.ts';
 import type { BookingFilter, BookingInput, BookingMoveInput } from '../../schemas/crm.ts';
 import { findClientByPhone } from './clients.ts';
@@ -317,6 +317,71 @@ async function writeLines(db: DbOrTx, bookingId: string, input: BookingInput) {
 		.values(input.sessions.map((s, i) => ({ bookingId, ...s, sort: i })));
 	if (input.addons.length)
 		await db.insert(bookingAddon).values(input.addons.map((a) => ({ bookingId, ...a })));
+}
+
+export type InquiryBookingInput = {
+	clientId: string;
+	title: string;
+	eventType: EventType;
+	/** From `?paket=`; an unknown or deleted package is ignored, never an error for a visitor */
+	packageId?: string | null;
+	message?: string | null;
+	/** "Tanggal acara (utama)" (yyyy-MM-dd); becomes the first session */
+	sessionDate?: string | null;
+	venue?: string | null;
+	city?: string | null;
+};
+
+/**
+ * Booking for a website inquiry (P1-08): Inquiry column top, origin `website_form`, package
+ * snapshot, one session (dated when the form gave a date) and a system activity. Runs on the
+ * caller's transaction, so the client match / create and this insert commit together.
+ */
+export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInput) {
+	let snapshot: PackageSnapshot | null = null;
+	let packageId: string | null = null;
+	if (input.packageId) {
+		try {
+			snapshot = await packageSnapshot(db, input.packageId);
+			packageId = input.packageId;
+		} catch (e) {
+			if (!(e instanceof ServiceError)) throw e;
+		}
+	}
+	const now = new Date();
+	const [row] = await db
+		.insert(booking)
+		.values({
+			clientId: input.clientId,
+			title: input.title,
+			eventType: input.eventType,
+			packageId,
+			packageSnapshot: snapshot,
+			agreedPrice: snapshot?.price ?? 0,
+			stage: 'inquiry',
+			position: await topOf(db, 'inquiry'),
+			origin: 'website_form',
+			inquiryMessage: input.message || null,
+			stageChangedAt: now
+		})
+		.returning({ id: booking.id });
+	await db.insert(bookingSession).values({
+		bookingId: row.id,
+		eventType: input.eventType,
+		date: input.sessionDate || null,
+		venue: input.venue || null,
+		city: input.city || null,
+		sort: 0
+	});
+	await db.insert(activity).values({
+		clientId: input.clientId,
+		bookingId: row.id,
+		type: 'system',
+		body: 'Inquiry masuk dari formulir website',
+		userId: null,
+		occurredAt: now
+	});
+	return { id: row.id };
 }
 
 /** New booking at the top of its column, with sessions, add-ons and a package snapshot */

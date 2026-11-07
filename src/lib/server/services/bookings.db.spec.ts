@@ -10,11 +10,13 @@ import {
 	booking,
 	bookingAddon,
 	bookingSession,
+	client,
 	packageCategory,
 	pkg
 } from '../db/schema/index';
 import {
 	createBooking,
+	createInquiryBooking,
 	getBookingForEdit,
 	listBoard,
 	listBookings,
@@ -251,6 +253,68 @@ describe.runIf(isDevDb)('bookings service', () => {
 
 			await moveBooking(tx, move(b.id, 'lost', { lostReason: 'Batal' }), null);
 			expect((await sameDateBookings(tx, [D2], a.id))[D2]).toBeUndefined();
+		}));
+
+	it('creates a website inquiry on the caller transaction (P1-08 helper)', () =>
+		inRollback(async (tx) => {
+			const [c] = await tx
+				.insert(client)
+				.values({ name: 'E2E CRM Spec Inquiry', phone: '6289970030001' })
+				.returning();
+			const [cat] = await tx
+				.insert(packageCategory)
+				.values({ name: 'E2E CRM Cat', position: 'a0' })
+				.returning();
+			const [p] = await tx
+				.insert(pkg)
+				.values({ categoryId: cat.id, name: 'E2E Silver', price: 6_500_000, position: 'a0' })
+				.returning();
+
+			const { id } = await createInquiryBooking(tx, {
+				clientId: c.id,
+				title: 'E2E CRM Inquiry',
+				eventType: 'wedding',
+				packageId: p.id,
+				message: 'Halo kak',
+				sessionDate: D1,
+				venue: 'Gedung Sate',
+				city: 'Bandung'
+			});
+			const [b] = await tx.select().from(booking).where(eq(booking.id, id));
+			expect(b).toMatchObject({
+				stage: 'inquiry',
+				origin: 'website_form',
+				inquiryMessage: 'Halo kak',
+				agreedPrice: 6_500_000,
+				packageId: p.id,
+				packageSnapshot: { name: 'E2E Silver', price: 6_500_000, category: 'E2E CRM Cat' }
+			});
+			const sessions = await tx
+				.select()
+				.from(bookingSession)
+				.where(eq(bookingSession.bookingId, id));
+			expect(sessions).toMatchObject([
+				{ eventType: 'wedding', date: D1, venue: 'Gedung Sate', city: 'Bandung' }
+			]);
+			const acts = await tx.select().from(activity).where(eq(activity.bookingId, id));
+			expect(acts.map((a) => a.body)).toEqual(['Inquiry masuk dari formulir website']);
+			// On top of Inquiry
+			expect((await listBoard(tx)).find((x) => x.stage === 'inquiry')?.id).toBe(id);
+
+			// Unknown package and no date: still saved, one undated session, no snapshot
+			const second = await createInquiryBooking(tx, {
+				clientId: c.id,
+				title: 'E2E CRM Inquiry 2',
+				eventType: 'akad',
+				packageId: '00000000-0000-0000-0000-000000000000'
+			});
+			const [b2] = await tx.select().from(booking).where(eq(booking.id, second.id));
+			expect(b2).toMatchObject({ packageId: null, packageSnapshot: null, agreedPrice: 0 });
+			const s2 = await tx
+				.select()
+				.from(bookingSession)
+				.where(eq(bookingSession.bookingId, second.id));
+			expect(s2).toMatchObject([{ eventType: 'akad', date: null }]);
 		}));
 
 	it('filters the list by text, stage, event type and session month', () =>
