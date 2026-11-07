@@ -1,4 +1,5 @@
-// CMS lists: packages (+ categories, add-ons), testimonials, FAQ (docs/02-DATA-MODEL.md →
+// CMS lists: portfolio (albums in portfolio.ts), packages (+ categories, add-ons), testimonials,
+// FAQ (docs/02-DATA-MODEL.md →
 // list_publish). The tables are the working copy; Terbitkan snapshots the visible rows into
 // list_publish, which is all the public site reads. Relative imports only.
 import { asc, count, eq, inArray, max } from 'drizzle-orm';
@@ -9,6 +10,7 @@ import {
 	type ListKey,
 	type ListSnapshots,
 	type PackagesSnapshot,
+	type PortfolioSnapshot,
 	type TestimonialSnapshot
 } from '../../cms/lists.ts';
 import type { DbOrTx } from '../db/client.ts';
@@ -18,13 +20,20 @@ import {
 	listPublish,
 	packageCategory,
 	pkg,
+	portfolioAlbum,
 	testimonial
 } from '../db/schema/index.ts';
 import { ServiceError } from './errors.ts';
 import { syncUsage } from './media.ts';
+import { visibleAlbumsWithItems } from './portfolio.ts';
 
 type Ordered =
-	typeof packageCategory | typeof pkg | typeof addon | typeof testimonial | typeof faqItem;
+	| typeof packageCategory
+	| typeof pkg
+	| typeof addon
+	| typeof testimonial
+	| typeof faqItem
+	| typeof portfolioAlbum;
 
 /* ---------- Order ---------- */
 
@@ -80,7 +89,7 @@ export async function saveFaq(
 
 export async function setVisible(
 	db: DbOrTx,
-	table: typeof faqItem | typeof testimonial | typeof pkg,
+	table: typeof faqItem | typeof testimonial | typeof pkg | typeof portfolioAlbum,
 	id: string,
 	visible: boolean
 ) {
@@ -294,6 +303,9 @@ export async function deleteAddon(db: DbOrTx, id: string) {
 
 /** What Terbitkan would publish right now (visible rows, in order) */
 export async function snapshot<K extends ListKey>(db: DbOrTx, list: K): Promise<ListSnapshots[K]> {
+	if (list === 'portfolio') {
+		return (await visibleAlbumsWithItems(db)) satisfies PortfolioSnapshot as ListSnapshots[K];
+	}
 	if (list === 'faq') {
 		const rows = await listFaq(db);
 		return rows
@@ -348,6 +360,11 @@ export async function snapshot<K extends ListKey>(db: DbOrTx, list: K): Promise<
 
 /** Media ids inside a snapshot (the published site still shows them) */
 function snapshotMedia(list: ListKey, data: unknown): string[] {
+	if (list === 'portfolio')
+		return (data as PortfolioSnapshot).flatMap((a) => [
+			...(a.cover ? [a.cover] : []),
+			...a.items.map((i) => i.media)
+		]);
 	if (list === 'testimonials')
 		return (data as TestimonialSnapshot).map((t) => t.photo).filter((v): v is string => !!v);
 	if (list === 'packages')
@@ -378,7 +395,11 @@ export async function listStatus(db: DbOrTx, list: ListKey) {
 }
 
 /** Terbitkan: snapshot the visible rows into list_publish in one transaction */
-export async function publishList(db: DbOrTx, list: ListKey, userId: string | null) {
+export async function publishList<K extends ListKey>(
+	db: DbOrTx,
+	list: K,
+	userId: string | null
+): Promise<ListSnapshots[K]> {
 	return db.transaction(async (tx) => {
 		const data = await snapshot(tx, list);
 		const now = new Date();

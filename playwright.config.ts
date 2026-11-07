@@ -13,6 +13,8 @@ export default defineConfig({
 	workers: 1,
 	fullyParallel: false,
 	timeout: 60_000,
+	// Server actions on the remote Neon dev branch can take a few seconds on a cold dev server
+	expect: { timeout: 15_000 },
 	retries: 0,
 	reporter: [['list']],
 	use: {

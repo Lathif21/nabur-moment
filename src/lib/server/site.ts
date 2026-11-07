@@ -45,3 +45,35 @@ export async function loadPublicList<K extends ListKey>(
 	}
 	return { data, media };
 }
+
+/** /portofolio: published albums (working copy in preview) with their cover images only */
+export async function loadPortfolio(event: Pick<RequestEvent, 'url' | 'locals'>) {
+	const albums = await readList(db, 'portfolio', { preview: isPreview(event) });
+	const media: Record<string, MediaItem> = {};
+	if (storage) {
+		const covers = albums.map((a) => a.cover).filter((v): v is string => !!v);
+		for (const m of await mediaByIds(db, covers)) media[m.id] = toMediaItem(m, storage);
+	}
+	return { albums, media };
+}
+
+/**
+ * /portofolio/[slug]: one published album (null when it is not published: hidden or added after
+ * the last Terbitkan), plus up to three others for "Album lainnya".
+ */
+export async function loadAlbum(event: Pick<RequestEvent, 'url' | 'locals'>, slug: string) {
+	const albums = await readList(db, 'portfolio', { preview: isPreview(event) });
+	const album = albums.find((a) => a.slug === slug) ?? null;
+	if (!album) return null;
+	const others = albums.filter((a) => a.id !== album.id).slice(0, 3);
+	const media: Record<string, MediaItem> = {};
+	if (storage) {
+		const ids = [
+			...(album.cover ? [album.cover] : []),
+			...album.items.map((i) => i.media),
+			...others.map((a) => a.cover).filter((v): v is string => !!v)
+		];
+		for (const m of await mediaByIds(db, ids)) media[m.id] = toMediaItem(m, storage);
+	}
+	return { album, others, media };
+}
