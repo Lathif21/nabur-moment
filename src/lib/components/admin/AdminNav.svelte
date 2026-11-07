@@ -2,15 +2,18 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import LogOut from '@lucide/svelte/icons/log-out';
 	import Wordmark from '#lib/components/Wordmark.svelte';
 	import { adminNav, isActive } from '#lib/nav.ts';
 
 	type Props = {
+		/** The logged-in user, shown above "Keluar" */
+		user: { name: string; email: string };
 		/** Called after a link is followed (closes the phone menu) */
 		onnavigate?: () => void;
 	};
 
-	let { onnavigate }: Props = $props();
+	let { user, onnavigate }: Props = $props();
 </script>
 
 <!-- Sidebar content, shared by the desktop column and the phone menu. Filtered by permission from P0-05. -->
@@ -57,6 +60,21 @@
 			Lihat situs
 			<span class="sr-only">(tab baru)</span>
 		</a>
-		<!-- Profile + Keluar arrive with auth (P0-03) -->
+		<div class="mt-2 flex items-center gap-2 border-t border-cream/15 pt-3 pl-3">
+			<div class="min-w-0 flex-1">
+				<p class="truncate text-small font-semibold">{user.name}</p>
+				<p class="truncate text-[0.75rem] text-cream/75">{user.email}</p>
+			</div>
+			<form method="post" action={resolve('admin/logout')}>
+				<button
+					type="submit"
+					class="icon-btn text-cream hover:bg-forest-90"
+					aria-label="Keluar"
+					title="Keluar"
+				>
+					<LogOut size={18} strokeWidth={1.75} aria-hidden="true" />
+				</button>
+			</form>
+		</div>
 	</div>
 </div>

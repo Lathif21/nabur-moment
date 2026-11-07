@@ -19,16 +19,16 @@ Goal: an empty but deployed, branded app; the owner can log in and manage access
 - **Done when:** `npm run dev` shows a page; `check`, `lint`, `test` pass; private GitHub repo pushed.
 - **Status (7 Nov 2026):** done except the push: local git repo with commits; Lathif creates the GitHub remote.
 
-### [ ] P0-02 Neon + Drizzle
+### [x] P0-02 Neon + Drizzle
 
 **Depends:** P0-01
 
 - Neon project in `aws-ap-southeast-1`, branches `production` + `dev`; `neon.ts` link
 - `db/client.ts` (pg pool, error listener, `attachDatabasePool`), `drizzle.config.ts`, scripts `db:generate`, `db:migrate`, `db:studio`
 - **Done when:** first migration runs on `dev`.
-- **Status (7 Nov 2026):** code done (client, config, `neon.ts`, scripts, migration `0000_extensions`). Waiting for Lathif to create the Neon project + `dev` branch and fill `.env`; then run `npm run db:migrate`.
+- **Status (7 Nov 2026):** done. Neon project `nabur-moment` (`sparkling-mode-62231100`, Befisien org), branches `production` + `dev`; `0000_extensions` and `0001_auth` applied on `dev`. Local `.env` points at `dev`.
 
-### [ ] P0-03 Auth
+### [x] P0-03 Auth
 
 **Depends:** P0-02
 
@@ -36,6 +36,7 @@ Goal: an empty but deployed, branded app; the owner can log in and manage access
 - `hooks.server.ts` → `locals.user`; `/admin/(app)` guard; `/admin/login`
 - `scripts/create-user.ts` (`--owner` flag)
 - **Done when:** the owner can log in / out; `/admin` redirects to login when logged out; sign-up impossible; inactive users are refused.
+- **Status (7 Nov 2026):** done. `users.db.spec.ts` (sign-in, inactive refused, sign-up refused, one owner) and e2e (redirect, wrong password, sign-up endpoint closed, login → logout). Dev owner `owner@naburmoment.test` (password in `.env` as `E2E_PASSWORD`). Login hero is a forest panel until the CMS has images.
 
 ### [x] P0-04 Design tokens + shells
 

@@ -7,7 +7,7 @@
 	import Wordmark from '#lib/components/Wordmark.svelte';
 	import type { LayoutProps } from './$types';
 
-	let { children }: LayoutProps = $props();
+	let { data, children }: LayoutProps = $props();
 
 	let menuOpen = $state(false);
 	const desktop = new MediaQuery('min-width: 64rem');
@@ -22,10 +22,10 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<!-- Guarded by session + permissions from P0-03 / P0-05. Each page renders a PageHeader in page-body. -->
+<!-- Guarded by +layout.server.ts (session; permissions from P0-05). Each page renders a PageHeader in page-body. -->
 <div class="min-h-dvh text-body lg:flex">
 	<aside class="sticky top-0 hidden h-dvh w-(--size-sidebar) shrink-0 lg:block">
-		<AdminNav />
+		<AdminNav user={data.user} />
 	</aside>
 
 	<header
@@ -57,7 +57,7 @@
 				>
 					<X size={20} strokeWidth={1.75} aria-hidden="true" />
 				</Dialog.Close>
-				<AdminNav onnavigate={() => (menuOpen = false)} />
+				<AdminNav user={data.user} onnavigate={() => (menuOpen = false)} />
 			</Dialog.Content>
 		</Dialog.Portal>
 	</Dialog.Root>

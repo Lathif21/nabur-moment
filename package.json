@@ -17,7 +17,8 @@
 		"test:e2e": "playwright test",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio"
+		"db:studio": "drizzle-kit studio",
+		"user:create": "tsx scripts/create-user.ts"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.ts",
@@ -57,6 +58,7 @@
 		"@lucide/svelte": "^1.70.0",
 		"@neon/config": "^1.13.0",
 		"@vercel/functions": "^3.11.0",
+		"better-auth": "^1.7.18",
 		"bits-ui": "^2.20.6",
 		"date-fns": "^4.4.0",
 		"drizzle-orm": "^0.45.4",
