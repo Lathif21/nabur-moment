@@ -11,12 +11,13 @@ Legend: `[ ]` to do · `[x]` done · **Depends:** tasks that must be finished fi
 
 Goal: an empty but deployed, branded app; the owner can log in and manage access.
 
-### [ ] P0-01 Scaffold
+### [x] P0-01 Scaffold
 
 - `npx sv create nabur-moment` (minimal, TypeScript), Tailwind v4, ESLint, Prettier, Vitest, Playwright, `adapter-vercel`
 - `#lib` imports, `src/env.ts`, `format.ts` (`rupiah`, `rupiahShort`, `dateID`, `countdown` → `H-12`, `phoneNormalize`) with tests
 - Move `docs/CLAUDE.md` to the repo root
 - **Done when:** `npm run dev` shows a page; `check`, `lint`, `test` pass; private GitHub repo pushed.
+- **Status (7 Nov 2026):** done except the push: local git repo with commits; Lathif creates the GitHub remote.
 
 ### [ ] P0-02 Neon + Drizzle
 
@@ -25,6 +26,7 @@ Goal: an empty but deployed, branded app; the owner can log in and manage access
 - Neon project in `aws-ap-southeast-1`, branches `production` + `dev`; `neon.ts` link
 - `db/client.ts` (pg pool, error listener, `attachDatabasePool`), `drizzle.config.ts`, scripts `db:generate`, `db:migrate`, `db:studio`
 - **Done when:** first migration runs on `dev`.
+- **Status (7 Nov 2026):** code done (client, config, `neon.ts`, scripts, migration `0000_extensions`). Waiting for Lathif to create the Neon project + `dev` branch and fill `.env`; then run `npm run db:migrate`.
 
 ### [ ] P0-03 Auth
 
@@ -35,7 +37,7 @@ Goal: an empty but deployed, branded app; the owner can log in and manage access
 - `scripts/create-user.ts` (`--owner` flag)
 - **Done when:** the owner can log in / out; `/admin` redirects to login when logged out; sign-up impossible; inactive users are refused.
 
-### [ ] P0-04 Design tokens + shells
+### [x] P0-04 Design tokens + shells
 
 **Depends:** P0-01
 

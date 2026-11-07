@@ -51,10 +51,16 @@
 	},
 	"dependencies": {
 		"@date-fns/tz": "^1.5.0",
+		"@fontsource/open-sans": "^5.3.0",
+		"@fontsource/pinyon-script": "^5.3.0",
+		"@fontsource/playfair-display": "^5.3.0",
+		"@lucide/svelte": "^1.70.0",
 		"@neon/config": "^1.13.0",
 		"@vercel/functions": "^3.11.0",
+		"bits-ui": "^2.20.6",
 		"date-fns": "^4.4.0",
 		"drizzle-orm": "^0.45.4",
-		"pg": "^8.23.1"
+		"pg": "^8.23.1",
+		"svelte-sonner": "^1.2.3"
 	}
 }

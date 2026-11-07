@@ -19,13 +19,15 @@ Source: `ref/` (logo on forest, colour + font sheet) and the two reference sites
 | `--forest-90` | derived   | Hover on forest (mix 90% forest + 10% black)                                                    |
 | `--sage-20`   | derived   | Soft background for kanban columns, selected rows                                               |
 
-Status colours for the admin (functional, not brand; final values checked for 4.5:1 at P0-04):
+Status colours for the admin (functional, not brand). Checked at P0-04: every text colour is ≥ 5.4:1 on white, cream, sage-20 and its own background.
 
-| Token       | Use                                  |
-| ----------- | ------------------------------------ |
-| `--success` | Paid, Lunas, Booked                  |
-| `--warning` | DP due, same-date warning, due today |
-| `--danger`  | Overdue, Batal, expense amounts      |
+| Token       | Text / background     | Use                                  |
+| ----------- | --------------------- | ------------------------------------ |
+| `--success` | `#2E6B3F` / `#E3F0E2` | Paid, Lunas, Booked                  |
+| `--warning` | `#8A5300` / `#FBEDCF` | DP due, same-date warning, due today |
+| `--danger`  | `#A3352C` / `#F8E1DD` | Overdue, Batal, expense amounts      |
+
+Secondary text `--ink-2` = `#4D5E5A` (6.3:1 on cream). Olive on `--sage-20` is 4.3:1, so no olive text on kanban columns.
 
 The maroon in the font sheet is only the image's background and is **not** part of the palette.
 
