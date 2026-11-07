@@ -1,0 +1,3 @@
+# Replaced by a generated robots.txt in P1-09
+User-agent: *
+Disallow: /admin

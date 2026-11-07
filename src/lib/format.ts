@@ -1,0 +1,122 @@
+// Display and normalisation helpers shared by the site, the admin and the services.
+// Client-safe: no server imports. Formatting rules: docs/01-PRD.md §9.
+import { TZDate, tz } from '@date-fns/tz';
+import { format } from 'date-fns';
+import { id as localeId } from 'date-fns/locale/id';
+
+/** All "today" / "late" / display logic runs in WIB, never the server's local time. */
+export const TZ = 'Asia/Jakarta';
+
+/** date-fns `in` option: `format(d, 'HH:mm', { in: wib })`. */
+export const wib = tz(TZ);
+
+/** The given instant (default: now) as a WIB-zoned date. */
+export function nowWib(date: Date | number = Date.now()): TZDate {
+	return new TZDate(+date, TZ);
+}
+
+/** Calendar day in WIB as `yyyy-MM-dd`, matching Postgres `date` columns. */
+export function dayKeyWib(date: Date | number = Date.now()): string {
+	return format(date, 'yyyy-MM-dd', { in: wib });
+}
+
+const DATE_PATTERNS = {
+	/** 22 Nov 2026 */
+	date: 'd MMM yyyy',
+	/** 22 Nov 14:00 */
+	datetime: 'd MMM HH:mm',
+	/** 22 Nov */
+	day: 'd MMM',
+	/** Minggu, 22 Nov 2026 */
+	long: 'EEEE, d MMM yyyy',
+	/** 22 November 2026 (invoice / kwitansi PDF) */
+	full: 'd MMMM yyyy',
+	/** 14:00 */
+	time: 'HH:mm'
+} as const;
+export type DateStyle = keyof typeof DATE_PATTERNS;
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Indonesian date display, always in WIB.
+ * A `yyyy-MM-dd` string (Postgres `date`) is a calendar day and is never shifted by time zone.
+ */
+export function dateID(value: Date | number | string, style: DateStyle = 'date'): string {
+	if (typeof value === 'string' && DATE_ONLY.test(value)) {
+		if (style === 'datetime' || style === 'time') {
+			throw new Error(`dateID: "${value}" is a calendar date and has no time`);
+		}
+		const [y, m, d] = value.split('-').map(Number);
+		return format(new Date(y, m - 1, d), DATE_PATTERNS[style], { locale: localeId });
+	}
+	const instant = typeof value === 'string' ? new Date(value) : value;
+	return format(instant, DATE_PATTERNS[style], { locale: localeId, in: wib });
+}
+
+/** `yyyy-MM-dd` → whole days since the epoch; calendar arithmetic without time zones. */
+function epochDay(day: string): number {
+	if (!DATE_ONLY.test(day)) throw new Error(`Expected yyyy-MM-dd, got "${day}"`);
+	const [y, m, d] = day.split('-').map(Number);
+	return Date.UTC(y, m - 1, d) / 86_400_000;
+}
+
+/**
+ * Countdown to an event day for cards and lists: `H-12` before, `Hari H` on the day, `H+3` after.
+ * `today` defaults to the current WIB calendar day.
+ */
+export function countdown(eventDay: string, today: string = dayKeyWib()): string {
+	const diff = epochDay(eventDay) - epochDay(today);
+	if (diff === 0) return 'Hari H';
+	return diff > 0 ? `H-${diff}` : `H+${-diff}`;
+}
+
+/**
+ * Normalise a phone number to digits with country code: `0812-3456-7890` → `6281234567890`.
+ * Indonesian numbers (0…, 8…, 62…, +62 (0)…) become `62…`; other `+` numbers keep their code.
+ * Returns null when empty or not a plausible number (8–15 digits).
+ */
+export function phoneNormalize(raw: string | null | undefined): string | null {
+	if (!raw) return null;
+	const trimmed = raw.trim();
+	let digits = trimmed.replace(/\D/g, '');
+	if (!digits) return null;
+
+	if (digits.startsWith('62')) {
+		digits = '62' + digits.slice(2).replace(/^0+/, '');
+	} else if (digits.startsWith('0')) {
+		digits = '62' + digits.replace(/^0+/, '');
+	} else if (digits.startsWith('8') && !trimmed.startsWith('+')) {
+		digits = '62' + digits;
+	}
+
+	return digits.length >= 8 && digits.length <= 15 ? digits : null;
+}
+
+/** Stored `6281234567890` → `+62 812-3456-7890` for display; other numbers get a `+` only */
+export function phoneDisplay(stored: string): string {
+	if (!stored.startsWith('62')) return `+${stored}`;
+	const local = stored.slice(2);
+	const groups = [local.slice(0, 3), local.slice(3, 7), local.slice(7)].filter(Boolean);
+	return `+62 ${groups.join('-')}`;
+}
+
+const MINUS = '−';
+const fullNumber = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+const shortNumber = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 });
+
+/** Full form for tables, forms and PDFs: `Rp 12.500.000`. Money is whole Rupiah. */
+export function rupiah(amount: number): string {
+	const sign = amount < 0 ? MINUS : '';
+	return `${sign}Rp ${fullNumber.format(Math.abs(amount))}`;
+}
+
+/** Short form for cards, tiles and charts: `Rp 12,5 jt`, `Rp 1,2 M`. Below 1 jt uses the full form. */
+export function rupiahShort(amount: number): string {
+	const abs = Math.abs(amount);
+	const sign = amount < 0 ? MINUS : '';
+	if (abs >= 1e12) return `${sign}Rp ${shortNumber.format(abs / 1e12)} T`;
+	if (abs >= 1e9) return `${sign}Rp ${shortNumber.format(abs / 1e9)} M`;
+	if (abs >= 1e6) return `${sign}Rp ${shortNumber.format(abs / 1e6)} jt`;
+	return rupiah(amount);
+}
