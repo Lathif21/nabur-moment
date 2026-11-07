@@ -16,6 +16,7 @@ import {
 	uuid
 } from 'drizzle-orm/pg-core';
 import { user } from './auth.ts';
+import { addon, pkg } from './cms.ts';
 
 /** Shared with portfolio_album (P1-07): import it from here, never declare a second enum */
 export const eventType = pgEnum('event_type', [
@@ -113,8 +114,8 @@ export const booking = pgTable(
 			.references(() => client.id, { onDelete: 'restrict' }),
 		title: text('title').notNull(),
 		eventType: eventType('event_type').notNull(),
-		// FK to package added in P1-05 (the package table arrives there)
-		packageId: uuid('package_id'),
+		// The booking keeps its own package snapshot, so deleting a package only clears the link
+		packageId: uuid('package_id').references(() => pkg.id, { onDelete: 'set null' }),
 		packageSnapshot: jsonb('package_snapshot').$type<PackageSnapshot>(),
 		/** whole Rupiah = package price + add-ons (no discounts) */
 		agreedPrice: bigint('agreed_price', { mode: 'number' }).default(0).notNull(),
@@ -187,8 +188,8 @@ export const bookingAddon = pgTable(
 		bookingId: uuid('booking_id')
 			.notNull()
 			.references(() => booking.id, { onDelete: 'cascade' }),
-		// FK to addon added in P1-05; null = custom line typed on the booking
-		addonId: uuid('addon_id'),
+		// null = custom line typed on the booking (or the add-on was deleted later)
+		addonId: uuid('addon_id').references(() => addon.id, { onDelete: 'set null' }),
 		/** snapshot */
 		name: text('name').notNull(),
 		/** snapshot, whole Rupiah */
