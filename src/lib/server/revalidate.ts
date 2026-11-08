@@ -21,10 +21,9 @@ export async function revalidate(paths: string[]) {
 		paths.map((p) => fetch(new URL('/' + p, site), { method: 'HEAD', headers, redirect: 'manual' }))
 	);
 	// Publishing still succeeds; the hourly expiry is the backstop. Logged for Vercel's runtime logs.
+	// (Uncached pages such as /booking answer MISS, which is fine.)
 	results.forEach((r, i) => {
-		const status = r.status === 'fulfilled' ? r.value.status : String(r.reason);
-		const cache = r.status === 'fulfilled' ? r.value.headers.get('x-vercel-cache') : null;
-		if (r.status === 'rejected' || r.value.status >= 300 || cache !== 'REVALIDATED')
-			console.warn(`revalidate /${paths[i]}: ${status} cache=${cache}`);
+		if (r.status === 'rejected') console.warn(`revalidate /${paths[i]}: ${String(r.reason)}`);
+		else if (r.value.status >= 300) console.warn(`revalidate /${paths[i]}: HTTP ${r.value.status}`);
 	});
 }

@@ -1,6 +1,7 @@
 // P1-09 "Done when": the sitemap lists every published album; the share preview shows the CMS
 // image. Also robots.txt and the admin noindex header. Dev branch only; restores what it changes.
 import { expect, test } from '@playwright/test';
+import { gotoFresh, revalidateRemote } from './helpers/fresh.ts';
 import { eq } from 'drizzle-orm';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import { media } from '../../src/lib/server/db/schema/index.ts';
@@ -77,6 +78,7 @@ test.beforeAll(async () => {
 	} finally {
 		await db.$client.end();
 	}
+	await revalidateRemote(['', `portofolio/${slug}`, 'portofolio', 'sitemap.xml']);
 });
 
 test.afterAll(async () => {
@@ -92,6 +94,7 @@ test.afterAll(async () => {
 	} finally {
 		await db.$client.end();
 	}
+	await revalidateRemote(['', `portofolio/${slug}`, 'portofolio', 'sitemap.xml']);
 });
 
 test('sitemap lists published albums; robots.txt and admin noindex', async ({ request }) => {
@@ -111,10 +114,12 @@ test('sitemap lists published albums; robots.txt and admin noindex', async ({ re
 
 test('share preview uses the CMS image and description', async ({ page }) => {
 	const storage = neonStorage(storageConfig(process.env)!);
-	await page.goto('/');
-	await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
-		'content',
-		storage.publicUrl(key)
+	await gotoFresh(page, '/', () =>
+		expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+			'content',
+			storage.publicUrl(key),
+			{ timeout: 3_000 }
+		)
 	);
 	await expect(page.locator('meta[property="og:description"]')).toHaveAttribute(
 		'content',
@@ -123,7 +128,7 @@ test('share preview uses the CMS image and description', async ({ page }) => {
 	await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/$/);
 
 	// Album pages describe themselves
-	await page.goto(`/portofolio/${slug}`);
+	await gotoFresh(page, `/portofolio/${slug}`, async (res) => expect(res?.status()).toBe(200));
 	await expect(page).toHaveTitle(new RegExp(`^SEO ${run} · `));
 	await expect(page.locator('meta[name="description"]')).toHaveAttribute(
 		'content',

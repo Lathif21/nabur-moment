@@ -1,6 +1,7 @@
 // P1-04 "Done when": header / footer / meta tags on the public layout come from published
 // settings. Dev branch only; restores the original settings.
 import { expect, test, type Page } from '@playwright/test';
+import { gotoFresh } from './helpers/fresh.ts';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import {
 	getSiteSettingsForEdit,
@@ -71,9 +72,10 @@ test('published settings drive the footer and meta tags', async ({ page, browser
 	await page.getByRole('button', { name: 'Terbitkan' }).click();
 	await expect(page.getByText('Pengaturan situs diterbitkan.')).toBeVisible();
 
-	await visitor.goto('/');
 	const footer = visitor.getByRole('contentinfo');
-	await expect(footer).toContainText(`Footer ${run}`);
+	await gotoFresh(visitor, '/', () =>
+		expect(footer).toContainText(`Footer ${run}`, { timeout: 3_000 })
+	);
 	await expect(footer.getByRole('link', { name: /WhatsApp/ })).toHaveAttribute(
 		'href',
 		'https://wa.me/6281234567890'

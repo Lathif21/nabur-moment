@@ -3,6 +3,7 @@
 // Real uploads to the dev bucket; cleans up after itself.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { gotoFresh } from './helpers/fresh.ts';
 import { eq, like } from 'drizzle-orm';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import { media, portfolioAlbum } from '../../src/lib/server/db/schema/index.ts';
@@ -146,7 +147,7 @@ test('album with photo, vertical video and embed: publish, view on a phone, hide
 	await expect(page.getByText('Portofolio diterbitkan.')).toBeVisible();
 
 	// 3. Viewable on a phone: photo, video, click-to-load embed
-	expect((await phone.goto(`/portofolio/${slug}`))?.status()).toBe(200);
+	await gotoFresh(phone, `/portofolio/${slug}`, async (res) => expect(res?.status()).toBe(200));
 	await phone.waitForLoadState('networkidle');
 	await expect(phone.getByRole('heading', { level: 1 })).toHaveText(title);
 	await expect(phone.getByRole('button', { name: `Perbesar foto: Foto ${run}` })).toBeVisible();
@@ -160,8 +161,9 @@ test('album with photo, vertical video and embed: publish, view on a phone, hide
 	await phone.getByRole('button', { name: `Perbesar foto: Foto ${run}` }).click();
 	await expect(phone.getByRole('dialog')).toBeVisible();
 	await phone.keyboard.press('Escape');
-	await phone.goto('/portofolio');
-	await expect(phone.getByRole('link', { name: new RegExp(title) })).toBeVisible();
+	await gotoFresh(phone, '/portofolio', () =>
+		expect(phone.getByRole('link', { name: new RegExp(title) })).toBeVisible({ timeout: 3_000 })
+	);
 
 	// 4. Hidden → still public until Terbitkan, then 404
 	await page.getByRole('button', { name: `Sembunyikan album ${title}` }).click();
@@ -171,6 +173,6 @@ test('album with photo, vertical video and embed: publish, view on a phone, hide
 	await expect(page.getByText('Belum diterbitkan')).toBeVisible();
 	await page.getByRole('button', { name: 'Terbitkan' }).click();
 	await expect(page.getByText('Belum diterbitkan')).toHaveCount(0);
-	expect((await phone.goto(`/portofolio/${slug}`))?.status()).toBe(404);
+	await gotoFresh(phone, `/portofolio/${slug}`, async (res) => expect(res?.status()).toBe(404));
 	await phone.close();
 });

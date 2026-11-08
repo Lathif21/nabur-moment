@@ -1,6 +1,7 @@
 // P1-05 "Done when": items can be created, reordered, hidden; nothing changes on the site until
 // Terbitkan; after it, hidden items are gone and order matches. Dev branch only; cleans up.
 import { expect, test, type Page } from '@playwright/test';
+import { gotoFresh } from './helpers/fresh.ts';
 import { like } from 'drizzle-orm';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import { faqItem } from '../../src/lib/server/db/schema/index.ts';
@@ -85,8 +86,11 @@ test('FAQ: create, reorder, hide, then Terbitkan', async ({ page, browser }) => 
 	await page.getByRole('button', { name: 'Terbitkan' }).click();
 	await expect(page.getByText('FAQ diterbitkan.')).toBeVisible();
 
-	await visitor.goto('/faq');
 	// FAQ accordion: one trigger button per published question, in order
-	await expect(visitor.getByRole('button').filter({ hasText: run })).toHaveText([q('C'), q('B')]);
+	await gotoFresh(visitor, '/faq', () =>
+		expect(visitor.getByRole('button').filter({ hasText: run })).toHaveText([q('C'), q('B')], {
+			timeout: 3_000
+		})
+	);
 	await visitor.close();
 });
