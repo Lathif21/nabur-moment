@@ -8,6 +8,10 @@ import { submitInquiry } from '#lib/server/services/inquiries.ts';
 import { loadPublicList, loadPublicPage } from '#lib/server/site.ts';
 import type { Actions, PageServerLoad } from './$types';
 
+// Not cached (ISR off): on Vercel an ISR function turns the action's fail(400) into a generic
+// "Bad request", so visitors would never see which field to fix. The page is cheap to render.
+export const config = { isr: false };
+
 // Booking / inquiry (03-SCREENS A6): intro from the CMS, packages from the published list,
 // lead sources for "Tahu kami dari mana". ?paket=<id> preselects a package in the browser.
 export const load: PageServerLoad = async (event) => {

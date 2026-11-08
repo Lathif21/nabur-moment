@@ -79,6 +79,16 @@ export const variables = defineEnvVars({
 		description: 'Encrypts the stored Instagram long-lived token (32 random bytes, base64)',
 		schema: optional
 	},
+	// Set by Vercel itself: this deployment's own host, and (when Protection Bypass for Automation is
+	// on) the secret that gets past preview deployment protection. Used to revalidate preview pages.
+	VERCEL_URL: {
+		description: 'Vercel system variable: host of this deployment (no protocol)',
+		schema: optional
+	},
+	VERCEL_AUTOMATION_BYPASS_SECRET: {
+		description: 'Vercel system variable: Protection Bypass for Automation secret',
+		schema: optional
+	},
 	PUBLIC_SITE_URL: {
 		description:
 			'Canonical public URL for links, sitemap and Open Graph (planned https://naburmoment.com)',
