@@ -20,8 +20,28 @@ export default defineConfig({
 	],
 	ssr: {
 		// sanitize-html (CJS) require()s htmlparser2, which is ESM-only. Node allows that, but
-		// Vercel's patched module loader throws ERR_REQUIRE_ESM, so bundle it into the server build.
-		noExternal: ['sanitize-html', 'htmlparser2']
+		// Vercel's patched module loader throws ERR_REQUIRE_ESM. So bundle sanitize-html with its
+		// whole dependency tree: a partial bundle leaves `__require('x')` calls that Vercel's file
+		// tracing does not follow (Cannot find module). After a build, the only `__require(...)`
+		// left in .svelte-kit/output/server/chunks must be Node built-ins.
+		noExternal: [
+			'sanitize-html',
+			'htmlparser2',
+			'domelementtype',
+			'domhandler',
+			'domutils',
+			'dom-serializer',
+			'entities',
+			'escape-string-regexp',
+			'is-plain-object',
+			'launder',
+			'dayjs',
+			'parse-srcset',
+			'postcss',
+			'nanoid',
+			'picocolors',
+			'source-map-js'
+		]
 	},
 	test: {
 		expect: { requireAssertions: true },
