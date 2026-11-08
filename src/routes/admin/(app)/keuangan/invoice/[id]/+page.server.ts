@@ -8,7 +8,7 @@ import { getInvoice, refreshOverdue } from '#lib/server/services/invoices.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 // Invoice page (03-SCREENS B6): items, status, "Tandai terkirim", "Batalkan (void)", payments.
-// "Unduh PDF" arrives with P3-03.
+// "Unduh PDF" (P3-03).
 export const load: PageServerLoad = async ({ locals, params }) => {
 	requirePerm(locals, 'invoices', 'read');
 	if (!z.uuid().safeParse(params.id).success) error(404, 'Invoice tidak ditemukan.');

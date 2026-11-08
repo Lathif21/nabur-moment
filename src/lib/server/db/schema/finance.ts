@@ -158,3 +158,28 @@ export const payment = pgTable(
 export const bookingInstallmentRelations = relations(bookingInstallment, ({ one }) => ({
 	booking: one(booking, { fields: [bookingInstallment.bookingId], references: [booking.id] })
 }));
+
+/**
+ * Business profile printed on invoices and kwitansi + the transfer account shown on invoices
+ * (Pengaturan → Bisnis & Keuangan). One row (id = 1), seeded by 0011. Not public content, so no
+ * draft / publish. DP is not a setting: always DP_PERCENT.
+ */
+export const appSettings = pgTable(
+	'app_settings',
+	{
+		id: smallint('id').primaryKey().default(1),
+		businessName: text('business_name').default('Nabur Moment').notNull(),
+		address: text('address'),
+		/** `628…` */
+		phone: text('phone'),
+		email: text('email'),
+		/** handle without `@` */
+		instagram: text('instagram'),
+		bankName: text('bank_name').default('BCA').notNull(),
+		bankNumber: text('bank_number'),
+		bankHolder: text('bank_holder'),
+		updatedAt: updatedAt(),
+		updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
+	},
+	(t) => [check('app_settings_single_row', sql`${t.id} = 1`)]
+);

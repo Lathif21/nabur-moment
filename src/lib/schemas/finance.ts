@@ -1,6 +1,7 @@
 // Form schemas for Keuangan (Phase 3). Messages are UI copy (Bahasa Indonesia).
 import { z } from 'zod';
 import { INVOICE_STATUSES } from '../finance.ts';
+import { clientSchema } from './crm.ts';
 
 const day = (label: string) =>
 	z
@@ -142,3 +143,33 @@ export const proofUploadSchema = z.object({
 	mime: z.enum(PROOF_MIME, 'Bukti harus berupa gambar JPG, PNG, atau WebP.'),
 	bytes: z.number().int().min(1).max(PROOF_MAX_BYTES, 'Ukuran bukti maksimal 10 MB.')
 });
+
+/** Pengaturan → Bisnis & Keuangan: profile on the PDFs and the BCA account on invoices */
+export const appSettingsSchema = z.object({
+	businessName: z.string().trim().min(1, 'Nama usaha wajib diisi.').max(120),
+	address: z
+		.string()
+		.trim()
+		.max(300)
+		.default('')
+		.transform((v) => v || null),
+	// Same rules as the client form: 628… phone, lower-case email, bare Instagram handle
+	phone: clientSchema.shape.phone,
+	email: clientSchema.shape.email,
+	instagram: clientSchema.shape.instagram,
+	bankNumber: z
+		.string()
+		.trim()
+		.max(30)
+		.default('')
+		.refine((v) => v === '' || /^[0-9 .-]{6,30}$/.test(v), 'Nomor rekening hanya angka.')
+		.transform((v) => v.replace(/[^0-9]/g, '') || null),
+	bankHolder: z
+		.string()
+		.trim()
+		.max(100)
+		.default('')
+		.transform((v) => v || null)
+});
+
+export type AppSettingsInput = z.output<typeof appSettingsSchema>;

@@ -7,6 +7,7 @@
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import FileDown from '@lucide/svelte/icons/file-down';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -375,6 +376,16 @@
 										<td>{PAYMENT_METHOD_LABEL[pay.method]}</td>
 										<td class="text-right tabular-nums">{rupiah(pay.amount)}</td>
 										<td class="text-right whitespace-nowrap">
+											<a
+												class="icon-btn"
+												href={resolve('/admin/(app)/keuangan/pembayaran/[id]/kwitansi', {
+													id: pay.id
+												})}
+												download
+												aria-label="Unduh kwitansi {pay.receiptNumber}"
+											>
+												<FileDown size={16} aria-hidden="true" />
+											</a>
 											{#if pay.proofMediaId}
 												<!-- eslint-disable svelte/no-navigation-without-resolve -- API route that redirects to a presigned file URL -->
 												<a

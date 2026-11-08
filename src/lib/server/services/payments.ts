@@ -370,3 +370,43 @@ export async function paidByBooking(db: DbOrTx, bookingIds: string[]) {
 		.groupBy(payment.bookingId);
 	return new Map(rows.map((r) => [r.bookingId, r.paid]));
 }
+
+/** Kwitansi data: the payment, who paid, what for, and the booking's balance after it */
+export async function getPaymentForReceipt(db: DbOrTx, id: string) {
+	const [row] = await db
+		.select({
+			id: payment.id,
+			receiptNumber: payment.receiptNumber,
+			paidOn: payment.paidOn,
+			amount: payment.amount,
+			method: payment.method,
+			note: payment.note,
+			invoiceNumber: invoice.number,
+			installmentKind: bookingInstallment.kind,
+			booking: { id: booking.id, title: booking.title, agreedPrice: booking.agreedPrice },
+			client: { name: client.name, phone: client.phone, city: client.city }
+		})
+		.from(payment)
+		.innerJoin(booking, eq(booking.id, payment.bookingId))
+		.innerJoin(client, eq(client.id, booking.clientId))
+		.leftJoin(invoice, eq(invoice.id, payment.invoiceId))
+		.leftJoin(bookingInstallment, eq(bookingInstallment.id, payment.installmentId))
+		.where(eq(payment.id, id));
+	if (!row) return null;
+	// Paid on the booking up to and including this receipt (receipt numbers order the same day)
+	const [{ paidSoFar }] = await db
+		.select({
+			paidSoFar: sql<number>`coalesce(sum(${payment.amount}), 0)::bigint`.mapWith(Number)
+		})
+		.from(payment)
+		.where(
+			and(
+				eq(payment.bookingId, row.booking.id),
+				// compared in SQL: created_at has microseconds, a JS Date only milliseconds
+				sql`(${payment.paidOn}, ${payment.createdAt}) <= (select p.paid_on, p.created_at from "payment" p where p.id = ${id})`
+			)
+		);
+	return { ...row, paidSoFar };
+}
+
+export type ReceiptDetail = NonNullable<Awaited<ReturnType<typeof getPaymentForReceipt>>>;

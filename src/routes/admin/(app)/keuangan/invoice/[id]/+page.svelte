@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import FileDown from '@lucide/svelte/icons/file-down';
 	import Ban from '@lucide/svelte/icons/ban';
 	import Send from '@lucide/svelte/icons/send';
 	import ConfirmDialog from '#lib/components/admin/ConfirmDialog.svelte';
@@ -128,7 +129,21 @@
 			{#if inv.notes}
 				<p class="card px-4 py-3 text-body whitespace-pre-line">{inv.notes}</p>
 			{/if}
-			<p class="text-small text-ink-2">Unduh PDF tersedia setelah modul PDF aktif.</p>
+			<div class="flex flex-wrap gap-2">
+				<a
+					class="btn btn--secondary"
+					href={resolve('/admin/(app)/keuangan/invoice/[id]/pdf', { id: inv.id })}
+					download
+				>
+					<FileDown size={16} aria-hidden="true" /> Unduh PDF
+				</a>
+				<a
+					class="btn btn--ghost"
+					href="{resolve('/admin/(app)/keuangan/invoice/[id]/pdf', { id: inv.id })}?view"
+					target="_blank"
+					rel="noopener">Lihat PDF</a
+				>
+			</div>
 		</section>
 
 		<div class="flex min-w-0 flex-col gap-6">
