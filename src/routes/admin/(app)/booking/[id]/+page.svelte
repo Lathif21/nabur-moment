@@ -7,7 +7,9 @@
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import ImageIcon from '@lucide/svelte/icons/image';
 	import Plus from '@lucide/svelte/icons/plus';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import ActivityTimeline from '#lib/components/crm/ActivityTimeline.svelte';
@@ -22,12 +24,16 @@
 		stageTone,
 		waLink
 	} from '#lib/crm.ts';
+	import ConfirmDialog from '#lib/components/admin/ConfirmDialog.svelte';
 	import CustomInvoiceDrawer from '#lib/components/finance/CustomInvoiceDrawer.svelte';
+	import DpPaidModal from '#lib/components/finance/DpPaidModal.svelte';
+	import PaymentDrawer from '#lib/components/finance/PaymentDrawer.svelte';
 	import InstallmentInvoiceModal from '#lib/components/finance/InstallmentInvoiceModal.svelte';
 	import {
 		DP_PERCENT,
 		INSTALLMENT_LABEL,
 		INVOICE_STATUS_LABEL,
+		PAYMENT_METHOD_LABEL,
 		invoiceTone
 	} from '#lib/finance.ts';
 	import { countdown, dateID, phoneDisplay, rupiah } from '#lib/format.ts';
@@ -40,8 +46,8 @@
 	const b = $derived(data.booking);
 	const open = $derived(b.stage !== 'lost' && b.stage !== 'completed');
 	const addonTotal = $derived(b.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0));
-	// Payments and expenses arrive in Phase 3 (P3-04, P3-06); until then nothing is recorded
-	const paid = 0;
+	const paid = $derived(data.payments.reduce((sum, p) => sum + p.amount, 0));
+	// Direct expenses arrive with P3-05
 	const costs = 0;
 
 	// ---------- stage ----------
@@ -74,8 +80,7 @@
 		data.allow.invoices.create &&
 		b.stage !== 'lost' &&
 		!row.cancelledAt &&
-		row.amount > 0 &&
-		!(row.kind === 'dp' && b.bookedAt);
+		row.amount - row.paid > 0;
 	let billing = $state<(typeof data.schedule)[number] | null>(null);
 	let installmentOpen = $state(false);
 	let customOpen = $state(false);
@@ -87,9 +92,16 @@
 	/** Until payments exist (P3-04) the DP counts as paid once the booking has `booked_at` */
 	function installmentStatus(row: (typeof data.schedule)[number]) {
 		if (row.cancelledAt) return { label: 'Dibatalkan', tone: '' };
-		if (row.kind === 'dp' && b.bookedAt) return { label: 'Lunas', tone: 'chip--success' };
+		if (row.amount > 0 && row.paid >= row.amount) return { label: 'Lunas', tone: 'chip--success' };
+		if (row.paid > 0) return { label: `Dibayar ${rupiah(row.paid)}`, tone: 'chip--warning' };
 		return { label: 'Belum dibayar', tone: 'chip--warning' };
 	}
+
+	// ---------- payments (P3-04) ----------
+	let paymentOpen = $state(false);
+	let dpPaidOpen = $state(false);
+	let deletingPayment = $state<(typeof data.payments)[number] | null>(null);
+	let deletePaymentOpen = $state(false);
 
 	// ---------- activity composer ----------
 	let noteType = $state<(typeof MANUAL_ACTIVITY_TYPES)[number]>('note');
@@ -321,9 +333,81 @@
 				</div>
 				<p class="text-small text-ink-2">
 					DP {DP_PERCENT}% tetap dari harga disepakati; pelunasan jatuh tempo di Hari H dan ikut
-					berubah bila harga atau tanggal sesi berubah. Kwitansi muncul di sini setelah modul
-					Pembayaran aktif.
+					berubah bila harga atau tanggal sesi berubah.
 				</p>
+
+				<div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+					<h3 class="font-semibold">Pembayaran masuk</h3>
+					{#if data.allow.payments && b.stage !== 'lost'}
+						<button type="button" class="btn btn--primary" onclick={() => (paymentOpen = true)}>
+							<Plus size={16} aria-hidden="true" /> Catat pembayaran
+						</button>
+					{/if}
+				</div>
+				{#if data.payments.length === 0}
+					<p class="text-body text-ink-2">Belum ada pembayaran.</p>
+				{:else}
+					<div class="card table-wrap">
+						<table class="table" aria-label="Pembayaran booking">
+							<thead>
+								<tr>
+									<th scope="col">Kwitansi</th>
+									<th scope="col">Tanggal</th>
+									<th scope="col">Untuk</th>
+									<th scope="col">Metode</th>
+									<th scope="col" class="text-right">Jumlah</th>
+									<th scope="col"><span class="sr-only">Aksi</span></th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.payments as pay (pay.id)}
+									<tr>
+										<td class="font-semibold whitespace-nowrap">{pay.receiptNumber}</td>
+										<td class="whitespace-nowrap">{dateID(pay.paidOn)}</td>
+										<td>
+											{pay.installmentKind
+												? INSTALLMENT_LABEL[pay.installmentKind]
+												: 'Invoice lain'}
+											{#if pay.invoiceNumber}<span class="block text-small text-ink-2"
+													>{pay.invoiceNumber}</span
+												>{/if}
+										</td>
+										<td>{PAYMENT_METHOD_LABEL[pay.method]}</td>
+										<td class="text-right tabular-nums">{rupiah(pay.amount)}</td>
+										<td class="text-right whitespace-nowrap">
+											{#if pay.proofMediaId}
+												<!-- eslint-disable svelte/no-navigation-without-resolve -- API route that redirects to a presigned file URL -->
+												<a
+													class="icon-btn"
+													href="/admin/api/payment-proofs/{pay.proofMediaId}/file"
+													target="_blank"
+													rel="noopener noreferrer"
+													aria-label="Lihat bukti {pay.receiptNumber}"
+												>
+													<ImageIcon size={16} aria-hidden="true" />
+												</a>
+												<!-- eslint-enable svelte/no-navigation-without-resolve -->
+											{/if}
+											{#if data.allow.deletePayments}
+												<button
+													type="button"
+													class="icon-btn"
+													aria-label="Hapus {pay.receiptNumber}"
+													onclick={() => {
+														deletingPayment = pay;
+														deletePaymentOpen = true;
+													}}
+												>
+													<Trash2 size={16} aria-hidden="true" />
+												</button>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 
 				<div class="mt-2 flex flex-wrap items-center justify-between gap-2">
 					<h3 class="font-semibold">Invoice</h3>
@@ -605,6 +689,28 @@
 {/if}
 
 <BookingMoveDialogs bind:this={dialogs} allowPayments={data.allow.payments} />
+
+{#if data.allow.payments}
+	<PaymentDrawer
+		bind:open={paymentOpen}
+		bookingId={b.id}
+		onsaved={(r) => {
+			if (r.dpPaid && data.allow.update) dpPaidOpen = true;
+		}}
+	/>
+{/if}
+<DpPaidModal bind:open={dpPaidOpen} bookingId={b.id} bookingTitle={b.title} />
+<ConfirmDialog
+	bind:open={deletePaymentOpen}
+	title="Hapus pembayaran?"
+	action="?/deletePayment"
+	fields={{ id: deletingPayment?.id ?? '' }}
+	confirmLabel="Hapus"
+	tone="danger"
+>
+	<strong>{deletingPayment?.receiptNumber}</strong> ({rupiah(deletingPayment?.amount ?? 0)}) dihapus
+	dan status invoicenya dihitung ulang.
+</ConfirmDialog>
 
 {#if data.allow.invoices.create}
 	<InstallmentInvoiceModal

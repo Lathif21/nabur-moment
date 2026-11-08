@@ -1,6 +1,7 @@
 <script lang="ts">
 	// "Invoice lain" (P3-02): an invoice with free lines for one booking (extra hours, reels…).
 	// No discount lines: prices are 0 or more. Posts to the hosting page's `?/customInvoice`.
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -24,13 +25,15 @@
 	let errors = $state<Record<string, string>>({});
 	let busy = $state(false);
 
+	// Only `open` is tracked: editing the dates or lines never resets the form
 	$effect(() => {
-		if (open) {
+		if (!open) return;
+		untrack(() => {
 			rows = [blank()];
 			issueDate = dayKeyWib();
 			dueDate = addDays(issueDate, DP_INVOICE_DAYS);
 			errors = {};
-		}
+		});
 	});
 
 	const clean = $derived(

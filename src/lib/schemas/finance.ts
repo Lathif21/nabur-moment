@@ -86,3 +86,59 @@ export const invoiceFilterSchema = z.object({
 });
 
 export type InvoiceFilter = z.output<typeof invoiceFilterSchema>;
+
+export const PAYMENT_METHODS = ['transfer', 'cash', 'ewallet', 'other'] as const;
+
+/**
+ * "Catat pembayaran": what it pays is an open invoice (`inv:<id>`) or an installment without one
+ * (`inst:<id>`); the amount is capped at what is still open there.
+ */
+export const paymentSchema = z.object({
+	bookingId: z.uuid('Pilih booking.'),
+	target: z
+		.string()
+		.regex(/^(inv|inst):[0-9a-f-]{36}$/i, 'Pilih invoice atau termin yang dibayar.')
+		.transform((v) => {
+			const [kind, id] = v.split(':');
+			return { kind: kind as 'inv' | 'inst', id };
+		}),
+	paidOn: day('tanggal bayar'),
+	amount: z.coerce
+		.number('Isi jumlah.')
+		.int('Jumlah harus angka bulat.')
+		.min(1, 'Jumlah harus lebih dari Rp 0.')
+		.max(10_000_000_000),
+	method: z.enum(PAYMENT_METHODS, 'Pilih metode.'),
+	proofMediaId: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable()),
+	note: notes
+});
+
+export type PaymentInput = z.output<typeof paymentSchema>;
+
+export const paymentIdSchema = z.object({ id: z.uuid() });
+
+/** Payment list filters: ?q=…&metode=…&bulan=yyyy-MM (paid month) */
+export const paymentFilterSchema = z.object({
+	q: z.string().trim().max(100).catch(''),
+	method: z.enum(PAYMENT_METHODS).nullable().catch(null),
+	month: z
+		.string()
+		.regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+		.nullable()
+		.catch(null)
+});
+
+export type PaymentFilter = z.output<typeof paymentFilterSchema>;
+
+/** Proof upload step 1 (images only; the browser sends the file as-is to the private bucket) */
+export const PROOF_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const PROOF_MAX_BYTES = 10 * 1024 * 1024;
+export const proofUploadSchema = z.object({
+	filename: z.string().trim().min(1).max(200),
+	mime: z.enum(PROOF_MIME, 'Bukti harus berupa gambar JPG, PNG, atau WebP.'),
+	bytes: z.number().int().min(1).max(PROOF_MAX_BYTES, 'Ukuran bukti maksimal 10 MB.')
+});

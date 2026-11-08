@@ -1,6 +1,7 @@
 <script lang="ts">
 	// "Buat invoice" for a DP / Pelunasan installment (P3-02). Posts to the hosting page's
 	// `?/invoice` action; the amount is the installment's, so only dates and notes are asked.
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import Modal from '#lib/components/admin/Modal.svelte';
 	import { INSTALLMENT_LABEL, suggestedDueDate } from '#lib/finance.ts';
@@ -29,14 +30,16 @@
 	let errors = $state<Record<string, string>>({});
 	let busy = $state(false);
 
-	// Fresh defaults each time it opens for an installment
+	// Fresh defaults each time it opens. Only `open` and `installment` are tracked: editing the dates never resets the form
 	$effect(() => {
-		if (open && installment) {
+		if (!open || !installment) return;
+		const inst = installment;
+		untrack(() => {
 			issueDate = dayKeyWib();
-			dueDate = suggestedDueDate(installment.kind, installment.dueDate, issueDate);
+			dueDate = suggestedDueDate(inst.kind, inst.dueDate, issueDate);
 			dueTouched = false;
 			errors = {};
-		}
+		});
 	});
 
 	function onIssueChange() {

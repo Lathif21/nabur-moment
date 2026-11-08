@@ -26,6 +26,7 @@ import { findClientByPhone } from './clients.ts';
 import { ServiceError } from './errors.ts';
 import { ensureSchedule } from './installments.ts';
 import { voidUnpaidInvoices } from './invoices.ts';
+import { bookingPaid } from './payments.ts';
 
 /** ServiceError fields the board reacts to with a modal */
 export const MOVE_NEEDS = {
@@ -554,13 +555,6 @@ export async function updateDelivery(db: DbOrTx, input: DeliveryInput) {
 	return row;
 }
 
-/** Money received for a booking. Payments arrive in P3-04; until then nothing is paid. */
-async function paidTotal(db: DbOrTx, bookingId: string): Promise<number> {
-	void db;
-	void bookingId;
-	return 0;
-}
-
 /**
  * Move a card (01-PRD §6). In one transaction: the rules, the new position, `stage_changed_at`
  * and a stage-change activity.
@@ -589,7 +583,7 @@ export async function moveBooking(db: DbOrTx, input: BookingMoveInput, userId: s
 		if (to === 'lost' && !input.lostReason)
 			throw new ServiceError('Tulis alasan batal.', MOVE_NEEDS.lostReason);
 		if (to === 'completed' && !input.confirmBalance) {
-			const balance = current.agreedPrice - (await paidTotal(tx, current.id));
+			const balance = current.agreedPrice - (await bookingPaid(tx, current.id));
 			if (balance > 0)
 				throw new ServiceError(
 					`Masih ada sisa tagihan ${rupiah(balance)}. Tetap tandai Selesai?`,

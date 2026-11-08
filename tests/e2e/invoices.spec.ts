@@ -117,6 +117,10 @@ test('DP invoice: create, mark sent, void; custom invoice; list', async ({ page 
 	await page.getByRole('button', { name: 'Invoice lain' }).click();
 	const drawer = page.getByRole('dialog', { name: 'Invoice lain' });
 	await drawer.getByLabel('Keterangan').fill('Tambahan 2 jam liputan');
+	// Changing a date keeps the lines (the open-effect tracks only `open`)
+	await drawer.getByLabel('Tanggal invoice').fill('2032-05-01');
+	await expect(drawer.getByLabel('Keterangan')).toHaveValue('Tambahan 2 jam liputan');
+	await drawer.getByLabel('Jatuh tempo').fill('2032-05-15');
 	await drawer.getByLabel('Harga satuan').fill('750000');
 	await drawer.getByLabel('Jumlah').fill('2');
 	await expect(drawer.getByTestId('custom-invoice-total')).toContainText(/1\.500\.000/);

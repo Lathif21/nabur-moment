@@ -80,7 +80,7 @@ export async function ensureSchedule(db: DbOrTx, bookingId: string) {
 			.where(eq(bookingInstallment.id, pelunasan.id));
 }
 
-/** The schedule for the booking page, DP first */
+/** The schedule for the booking page, DP first, with what was paid on each */
 export async function listSchedule(db: DbOrTx, bookingId: string) {
 	return db
 		.select({
@@ -88,7 +88,11 @@ export async function listSchedule(db: DbOrTx, bookingId: string) {
 			kind: bookingInstallment.kind,
 			amount: bookingInstallment.amount,
 			dueDate: bookingInstallment.dueDate,
-			cancelledAt: bookingInstallment.cancelledAt
+			cancelledAt: bookingInstallment.cancelledAt,
+			/** received on this installment (P3-04) */
+			paid: sql<number>`(select coalesce(sum(p.amount), 0) from "payment" p where p.installment_id = "booking_installment"."id")::bigint`.mapWith(
+				Number
+			)
 		})
 		.from(bookingInstallment)
 		.where(eq(bookingInstallment.bookingId, bookingId))

@@ -6,6 +6,7 @@ import { activity, booking, client, leadSource } from '../db/schema/index.ts';
 import { phoneDisplay } from '../../format.ts';
 import type { ClientInput } from '../../schemas/crm.ts';
 import { listActivities } from './activity.ts';
+import { paidByBooking } from './payments.ts';
 import { ServiceError } from './errors.ts';
 
 export type ClientFilter = { q?: string; sourceId?: string | null; archived?: boolean };
@@ -118,12 +119,20 @@ export async function getClient(db: DbOrTx, id: string) {
 
 	const activities = await listActivities(db, { clientId: id }, 100);
 
-	// Payments arrive in Phase 3; until then "paid" is 0 and the outstanding total is the value
-	const value = bookings
-		.filter((b) => b.stage !== 'lost')
-		.reduce((sum, b) => sum + b.agreedPrice, 0);
+	// Paid counts every payment (a kept DP on a Batal booking too); outstanding only open bookings
+	const paidMap = await paidByBooking(
+		db,
+		bookings.map((b) => b.id)
+	);
+	const open = bookings.filter((b) => b.stage !== 'lost');
+	const value = open.reduce((sum, b) => sum + b.agreedPrice, 0);
+	const paid = [...paidMap.values()].reduce((sum, n) => sum + n, 0);
+	const outstanding = open.reduce(
+		(sum, b) => sum + Math.max(0, b.agreedPrice - (paidMap.get(b.id) ?? 0)),
+		0
+	);
 
-	return { client: row, bookings, activities, totals: { value, paid: 0, outstanding: value } };
+	return { client: row, bookings, activities, totals: { value, paid, outstanding } };
 }
 
 /** Exact match on the normalised WhatsApp number (used by the inquiry form in P1-08 too) */
