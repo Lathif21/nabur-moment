@@ -115,7 +115,7 @@ test('settings save the BCA account; invoice and kwitansi download as PDFs', asy
 	await page.getByLabel('Nomor rekening').fill('123-456-7890');
 	await page.getByLabel('Atas nama').fill('Nabur Moment');
 	await page.getByLabel('WhatsApp').fill('0812 3456 7890');
-	await page.getByRole('button', { name: 'Simpan' }).click();
+	await page.getByRole('button', { name: 'Simpan', exact: true }).click();
 	await expect(page.getByText('Pengaturan bisnis disimpan.')).toBeVisible();
 	await page.reload();
 	await expect(page.getByLabel('Nomor rekening')).toHaveValue('1234567890');
@@ -123,7 +123,7 @@ test('settings save the BCA account; invoice and kwitansi download as PDFs', asy
 
 	// Wrong input is refused field by field
 	await page.getByLabel('WhatsApp').fill('12');
-	await page.getByRole('button', { name: 'Simpan' }).click();
+	await page.getByRole('button', { name: 'Simpan', exact: true }).click();
 	await expect(page.getByText('Nomor WhatsApp tidak valid.')).toBeVisible();
 
 	// Invoice page → Unduh PDF

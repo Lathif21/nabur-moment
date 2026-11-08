@@ -10,7 +10,7 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async ({ locals, params, setHeaders }) => {
 	requirePerm(locals, 'payments', 'read');
 	if (!z.uuid().safeParse(params.id).success) error(404, 'Bukti tidak ditemukan.');
-	const key = await proofKey(db, params.id);
+	const key = await proofKey(db, params.id, 'proofs');
 	if (!key) error(404, 'Bukti tidak ditemukan.');
 	setHeaders({ 'cache-control': 'private, no-store' });
 	// The presigned URL is on the storage host, so the redirect is external

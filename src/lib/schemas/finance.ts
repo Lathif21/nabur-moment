@@ -173,3 +173,64 @@ export const appSettingsSchema = z.object({
 });
 
 export type AppSettingsInput = z.output<typeof appSettingsSchema>;
+
+/** Pengeluaran form: booking empty = overhead */
+export const expenseSchema = z.object({
+	spentOn: day('tanggal'),
+	amount: z.coerce
+		.number('Isi jumlah.')
+		.int('Jumlah harus angka bulat.')
+		.min(1, 'Jumlah harus lebih dari Rp 0.')
+		.max(10_000_000_000),
+	categoryId: z.uuid('Pilih kategori.'),
+	bookingId: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable()),
+	description: z
+		.string()
+		.trim()
+		.max(500)
+		.default('')
+		.transform((v) => v || null),
+	method: z.enum(PAYMENT_METHODS, 'Pilih metode.'),
+	receiptMediaId: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable())
+});
+
+export type ExpenseInput = z.output<typeof expenseSchema>;
+
+export const expenseIdSchema = z.object({ id: z.uuid() });
+
+/** Pengeluaran list filters: ?q=…&bulan=yyyy-MM&kategori=<id>&jenis=booking|overhead */
+export const expenseFilterSchema = z.object({
+	q: z.string().trim().max(100).catch(''),
+	month: z
+		.string()
+		.regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+		.nullable()
+		.catch(null),
+	categoryId: z.uuid().nullable().catch(null),
+	scope: z.enum(['booking', 'overhead']).nullable().catch(null)
+});
+
+export type ExpenseFilter = z.output<typeof expenseFilterSchema>;
+
+/** Expense category: add / rename */
+export const expenseCategorySchema = z.object({
+	id: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable()),
+	name: z.string().trim().min(1, 'Nama kategori wajib diisi.').max(60)
+});
+
+export const expenseCategoryArchiveSchema = z.object({
+	id: z.uuid(),
+	archived: z.enum(['true', 'false']).transform((v) => v === 'true')
+});

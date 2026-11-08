@@ -1,5 +1,5 @@
-// Payment proofs (P3-04): a transfer screenshot uploaded by the browser straight to the private
-// bucket with a presigned PUT (never through a Vercel function), kept as a `media` row with
+// Private images: payment proofs (P3-04) and expense receipts (P3-05), uploaded by the browser
+// straight to the private bucket with a presigned PUT (never through a Vercel function), kept as a `media` row with
 // bucket = private-files. Downloads go through a permission-checked route that redirects to a
 // short presigned GET. Relative imports only.
 import { randomUUID } from 'node:crypto';
@@ -21,12 +21,14 @@ export async function createProofUpload(
 	db: DbOrTx,
 	storage: FileStorage,
 	input: { filename: string; mime: string },
-	userId: string | null
+	userId: string | null,
+	/** Key prefix: payment proofs or expense receipts */
+	folder: 'proofs' | 'receipts' = 'proofs'
 ) {
 	const ext = EXT[input.mime];
-	if (!ext) throw new ServiceError('Bukti harus berupa gambar JPG, PNG, atau WebP.');
+	if (!ext) throw new ServiceError('File harus berupa gambar JPG, PNG, atau WebP.');
 	const id = randomUUID();
-	const key = `proofs/${id}/proof.${ext}`;
+	const key = `${folder}/${id}/file.${ext}`;
 	await db.insert(media).values({
 		id,
 		kind: 'image',
@@ -34,7 +36,7 @@ export async function createProofUpload(
 		key,
 		filename: input.filename.slice(0, 200),
 		mime: input.mime,
-		alt: 'Bukti pembayaran',
+		alt: folder === 'proofs' ? 'Bukti pembayaran' : 'Nota pengeluaran',
 		uploadedBy: userId,
 		status: 'pending'
 	});
@@ -48,14 +50,14 @@ export async function confirmProofUpload(db: DbOrTx, storage: FileStorage, id: s
 		.select()
 		.from(media)
 		.where(and(eq(media.id, id), eq(media.bucket, PRIVATE_BUCKET)));
-	if (!row || !row.key) throw new ServiceError('Bukti tidak ditemukan.');
+	if (!row || !row.key) throw new ServiceError('File tidak ditemukan.');
 	if (row.status === 'ready') return row;
 	const bytes = await storage.size(PRIVATE_BUCKET, row.key);
 	if (bytes === null) throw new ServiceError('Unggahan belum lengkap. Coba unggah ulang.');
 	if (bytes > PROOF_MAX_BYTES) {
 		await storage.remove(PRIVATE_BUCKET, [row.key]);
 		await db.delete(media).where(eq(media.id, id));
-		throw new ServiceError('Ukuran bukti maksimal 10 MB.');
+		throw new ServiceError('Ukuran file maksimal 10 MB.');
 	}
 	const [ready] = await db
 		.update(media)
@@ -65,11 +67,14 @@ export async function confirmProofUpload(db: DbOrTx, storage: FileStorage, id: s
 	return ready;
 }
 
-/** Object key of a ready proof, for the download redirect */
-export async function proofKey(db: DbOrTx, id: string) {
+/**
+ * Object key of a ready private image of that kind, for the download redirect (an expense
+ * receipt route never serves a payment proof, and the other way round)
+ */
+export async function proofKey(db: DbOrTx, id: string, folder: 'proofs' | 'receipts') {
 	const [row] = await db
 		.select({ key: media.key })
 		.from(media)
 		.where(and(eq(media.id, id), eq(media.bucket, PRIVATE_BUCKET), eq(media.status, 'ready')));
-	return row?.key ?? null;
+	return row?.key?.startsWith(`${folder}/`) ? row.key : null;
 }

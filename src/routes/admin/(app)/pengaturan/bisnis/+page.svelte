@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
+	import ExpenseCategories from '#lib/components/finance/ExpenseCategories.svelte';
 	import { phoneDisplay } from '#lib/format.ts';
 	import { toast } from '#lib/toast.ts';
 	import type { PageProps } from './$types';
@@ -173,4 +174,11 @@
 			</div>
 		{/if}
 	</form>
+
+	<ExpenseCategories
+		categories={data.categories}
+		canCreate={data.canCreate}
+		canEdit={data.canEdit}
+		canDelete={data.canDelete}
+	/>
 </div>

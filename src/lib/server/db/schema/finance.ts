@@ -1,5 +1,6 @@
 // Accounting (docs/02-DATA-MODEL.md → Accounting): payment schedule (P3-01), invoices + counter
-// + the payment table (P3-02; payments are recorded in P3-04), expenses (P3-05).
+// + the payment table (P3-02; payments are recorded in P3-04), app settings (P3-03), expenses
+// (P3-05).
 // No $env / $lib imports.
 import { relations, sql } from 'drizzle-orm';
 import {
@@ -14,6 +15,7 @@ import {
 	smallint,
 	text,
 	timestamp,
+	boolean,
 	uniqueIndex,
 	uuid
 } from 'drizzle-orm/pg-core';
@@ -182,4 +184,45 @@ export const appSettings = pgTable(
 		updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 	},
 	(t) => [check('app_settings_single_row', sql`${t.id} = 1`)]
+);
+
+/** Expense categories (owner-editable; dummy list seeded by 0012). Delete only when unused. */
+export const expenseCategory = pgTable('expense_category', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	name: text('name').notNull().unique(),
+	/** fractional index */
+	position: text('position').notNull(),
+	archived: boolean('archived').default(false).notNull(),
+	createdAt: createdAt()
+});
+
+/**
+ * Money out (P3-05). With `booking_id` = a direct cost of that booking; without = overhead.
+ * Profit = payments − expenses (both by date). Receipt photo in the private bucket.
+ */
+export const expense = pgTable(
+	'expense',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		spentOn: date('spent_on').notNull(),
+		/** whole Rupiah */
+		amount: bigint('amount', { mode: 'number' }).notNull(),
+		categoryId: uuid('category_id')
+			.notNull()
+			.references(() => expenseCategory.id, { onDelete: 'restrict' }),
+		/** null = overhead */
+		bookingId: uuid('booking_id').references(() => booking.id, { onDelete: 'restrict' }),
+		description: text('description'),
+		method: paymentMethod('method').notNull(),
+		receiptMediaId: uuid('receipt_media_id').references(() => media.id, { onDelete: 'set null' }),
+		createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+		createdAt: createdAt(),
+		updatedAt: updatedAt()
+	},
+	(t) => [
+		index('expense_spent_on_idx').on(t.spentOn),
+		index('expense_booking_idx').on(t.bookingId),
+		index('expense_category_idx').on(t.categoryId),
+		check('expense_amount_positive', sql`${t.amount} > 0`)
+	]
 );

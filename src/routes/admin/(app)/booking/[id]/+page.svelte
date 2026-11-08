@@ -28,6 +28,7 @@
 	import ConfirmDialog from '#lib/components/admin/ConfirmDialog.svelte';
 	import CustomInvoiceDrawer from '#lib/components/finance/CustomInvoiceDrawer.svelte';
 	import DpPaidModal from '#lib/components/finance/DpPaidModal.svelte';
+	import ExpenseDrawer from '#lib/components/finance/ExpenseDrawer.svelte';
 	import PaymentDrawer from '#lib/components/finance/PaymentDrawer.svelte';
 	import InstallmentInvoiceModal from '#lib/components/finance/InstallmentInvoiceModal.svelte';
 	import {
@@ -48,8 +49,18 @@
 	const open = $derived(b.stage !== 'lost' && b.stage !== 'completed');
 	const addonTotal = $derived(b.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0));
 	const paid = $derived(data.payments.reduce((sum, p) => sum + p.amount, 0));
-	// Direct expenses arrive with P3-05
-	const costs = 0;
+	const costs = $derived(data.expenses.reduce((sum, e) => sum + e.amount, 0));
+
+	// ---------- expenses (P3-05) ----------
+	type Expense = (typeof data.expenses)[number];
+	let expenseOpen = $state(false);
+	let editingExpense = $state<Expense | null>(null);
+	function openExpense(e: Expense | null) {
+		editingExpense = e;
+		expenseOpen = true;
+	}
+	let deletingExpense = $state<Expense | null>(null);
+	let deleteExpenseOpen = $state(false);
 
 	// ---------- stage ----------
 	let dialogs: BookingMoveDialogs;
@@ -476,10 +487,84 @@
 
 			<section class="flex flex-col gap-3" aria-labelledby="costs-title">
 				<h2 id="costs-title" class="font-display text-section-title">Biaya</h2>
-				<div class="card px-4 py-3 text-body text-ink-2">
-					Biaya langsung untuk booking ini (kru, transport, sewa alat) dicatat di sini setelah modul
-					Pengeluaran aktif.
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<p class="text-small text-ink-2">
+						Biaya langsung booking ini: kru, transport, sewa alat.
+					</p>
+					{#if data.allow.expenses.create}
+						<button type="button" class="btn btn--secondary" onclick={() => openExpense(null)}>
+							<Plus size={16} aria-hidden="true" /> Tambah biaya
+						</button>
+					{/if}
 				</div>
+				{#if data.expenses.length === 0}
+					<p class="text-body text-ink-2">Belum ada biaya.</p>
+				{:else}
+					<div class="card table-wrap">
+						<table class="table" aria-label="Biaya booking">
+							<thead>
+								<tr>
+									<th scope="col">Tanggal</th>
+									<th scope="col">Kategori</th>
+									<th scope="col" class="text-right">Jumlah</th>
+									<th scope="col"><span class="sr-only">Aksi</span></th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.expenses as e (e.id)}
+									<tr>
+										<td class="whitespace-nowrap">{dateID(e.spentOn)}</td>
+										<td>
+											{e.categoryName}
+											{#if e.description}<span class="block text-small text-ink-2"
+													>{e.description}</span
+												>{/if}
+										</td>
+										<td class="text-right tabular-nums">{rupiah(e.amount)}</td>
+										<td class="text-right whitespace-nowrap">
+											{#if e.receiptMediaId}
+												<!-- eslint-disable svelte/no-navigation-without-resolve -- API route that redirects to a presigned file URL -->
+												<a
+													class="icon-btn"
+													href="/admin/api/expense-receipts/{e.receiptMediaId}/file"
+													target="_blank"
+													rel="noopener noreferrer"
+													aria-label="Lihat nota {e.categoryName} {dateID(e.spentOn)}"
+												>
+													<ImageIcon size={16} aria-hidden="true" />
+												</a>
+												<!-- eslint-enable svelte/no-navigation-without-resolve -->
+											{/if}
+											{#if data.allow.expenses.update}
+												<button
+													type="button"
+													class="icon-btn"
+													aria-label="Ubah biaya {e.categoryName} {dateID(e.spentOn)}"
+													onclick={() => openExpense(e)}
+												>
+													<Pencil size={16} aria-hidden="true" />
+												</button>
+											{/if}
+											{#if data.allow.expenses.delete}
+												<button
+													type="button"
+													class="icon-btn"
+													aria-label="Hapus biaya {e.categoryName} {dateID(e.spentOn)}"
+													onclick={() => {
+														deletingExpense = e;
+														deleteExpenseOpen = true;
+													}}
+												>
+													<Trash2 size={16} aria-hidden="true" />
+												</button>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 			</section>
 
 			<section class="flex flex-col gap-3" aria-labelledby="delivery-title">
@@ -721,6 +806,26 @@
 >
 	<strong>{deletingPayment?.receiptNumber}</strong> ({rupiah(deletingPayment?.amount ?? 0)}) dihapus
 	dan status invoicenya dihitung ulang.
+</ConfirmDialog>
+
+{#if data.categories}
+	<ExpenseDrawer
+		bind:open={expenseOpen}
+		expense={editingExpense}
+		categories={data.categories}
+		bookingId={b.id}
+	/>
+{/if}
+<ConfirmDialog
+	bind:open={deleteExpenseOpen}
+	title="Hapus biaya?"
+	action="?/deleteExpense"
+	fields={{ id: deletingExpense?.id ?? '' }}
+	confirmLabel="Hapus"
+	tone="danger"
+>
+	<strong>{deletingExpense?.categoryName}</strong>
+	{rupiah(deletingExpense?.amount ?? 0)} dihapus dari booking ini.
 </ConfirmDialog>
 
 {#if data.allow.invoices.create}
