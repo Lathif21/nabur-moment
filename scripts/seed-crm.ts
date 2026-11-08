@@ -15,6 +15,7 @@ import {
 	leadSource
 } from '../src/lib/server/db/schema/index.ts';
 import { nowWib } from '../src/lib/format.ts';
+import { ensureSchedule } from '../src/lib/server/services/installments.ts';
 
 try {
 	process.loadEnvFile();
@@ -290,6 +291,7 @@ try {
 						qty: a.qty ?? 1
 					}))
 				);
+			await ensureSchedule(tx, b.id);
 
 			await tx.insert(activity).values([
 				{

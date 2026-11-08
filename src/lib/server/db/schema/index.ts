@@ -7,3 +7,4 @@ export * from './media.ts';
 export * from './cms.ts';
 export * from './crm.ts';
 export * from './portfolio.ts';
+export * from './finance.ts';

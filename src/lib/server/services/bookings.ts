@@ -24,6 +24,7 @@ import type {
 } from '../../schemas/crm.ts';
 import { findClientByPhone } from './clients.ts';
 import { ServiceError } from './errors.ts';
+import { ensureSchedule } from './installments.ts';
 
 /** ServiceError fields the board reacts to with a modal */
 export const MOVE_NEEDS = {
@@ -442,6 +443,7 @@ export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInpu
 		city: input.city || null,
 		sort: 0
 	});
+	await ensureSchedule(db, row.id);
 	await db.insert(activity).values({
 		clientId: input.clientId,
 		bookingId: row.id,
@@ -477,6 +479,7 @@ export async function createBooking(db: DbOrTx, input: BookingInput, userId: str
 			})
 			.returning({ id: booking.id });
 		await writeLines(tx, row.id, input);
+		await ensureSchedule(tx, row.id);
 		await tx.insert(activity).values({
 			clientId,
 			bookingId: row.id,
@@ -529,6 +532,8 @@ export async function updateBooking(
 		await tx.delete(bookingSession).where(eq(bookingSession.bookingId, id));
 		await tx.delete(bookingAddon).where(eq(bookingAddon.bookingId, id));
 		await writeLines(tx, id, input);
+		// price, add-ons or sessions may have changed: DP / pelunasan amounts and due date
+		await ensureSchedule(tx, id);
 		return { id, clientId };
 	});
 }
@@ -611,6 +616,8 @@ export async function moveBooking(db: DbOrTx, input: BookingMoveInput, userId: s
 			userId,
 			occurredAt: now
 		});
+		// Batal cancels the pelunasan, leaving Batal restores it (P3-02 voids unpaid invoices here)
+		await ensureSchedule(tx, current.id);
 		return { from, to, changed: true };
 	});
 }

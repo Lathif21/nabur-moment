@@ -21,6 +21,7 @@
 		stageTone,
 		waLink
 	} from '#lib/crm.ts';
+	import { DP_PERCENT, INSTALLMENT_LABEL } from '#lib/finance.ts';
 	import { countdown, dateID, phoneDisplay, rupiah } from '#lib/format.ts';
 	import { MANUAL_ACTIVITY_TYPES } from '#lib/schemas/crm.ts';
 	import { toast } from '#lib/toast.ts';
@@ -57,6 +58,13 @@
 	}
 
 	let editOpen = $state(false);
+
+	/** Until payments exist (P3-04) the DP counts as paid once the booking has `booked_at` */
+	function installmentStatus(row: (typeof data.schedule)[number]) {
+		if (row.cancelledAt) return { label: 'Dibatalkan', tone: '' };
+		if (row.kind === 'dp' && b.bookedAt) return { label: 'Lunas', tone: 'chip--success' };
+		return { label: 'Belum dibayar', tone: 'chip--warning' };
+	}
 
 	// ---------- activity composer ----------
 	let noteType = $state<(typeof MANUAL_ACTIVITY_TYPES)[number]>('note');
@@ -229,10 +237,48 @@
 
 			<section class="flex flex-col gap-3" aria-labelledby="payments-title">
 				<h2 id="payments-title" class="font-display text-section-title">Pembayaran</h2>
-				<div class="card px-4 py-3 text-body text-ink-2">
-					Jadwal DP 50% + pelunasan, invoice, dan kwitansi muncul di sini setelah modul Keuangan
-					aktif.
+				<div class="card table-wrap">
+					<table class="table" aria-label="Jadwal pembayaran">
+						<thead>
+							<tr>
+								<th scope="col">Termin</th>
+								<th scope="col">Jatuh tempo</th>
+								<th scope="col" class="text-right">Jumlah</th>
+								<th scope="col">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each data.schedule as row (row.id)}
+								{@const status = installmentStatus(row)}
+								<tr data-kind={row.kind}>
+									<td class="font-semibold">{INSTALLMENT_LABEL[row.kind]}</td>
+									<td>
+										{#if row.kind === 'dp'}
+											<span class="text-ink-2">Sebelum Booked</span>
+										{:else if row.dueDate}
+											{dateID(row.dueDate)}
+											<span class="block text-small text-ink-2">Hari H</span>
+										{:else}
+											<span class="text-ink-2">Menunggu tanggal sesi</span>
+										{/if}
+									</td>
+									<td
+										class={[
+											'text-right tabular-nums',
+											row.cancelledAt && 'text-ink-2 line-through'
+										]}>{rupiah(row.amount)}</td
+									>
+									<td><span class="chip {status.tone}">{status.label}</span></td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
 				</div>
+				<p class="text-small text-ink-2">
+					DP {DP_PERCENT}% tetap dari harga disepakati; pelunasan jatuh tempo di Hari H dan ikut
+					berubah bila harga atau tanggal sesi berubah. Invoice dan kwitansi muncul di sini setelah
+					modul Invoice dan Pembayaran aktif.
+				</p>
 			</section>
 
 			<section class="flex flex-col gap-3" aria-labelledby="costs-title">

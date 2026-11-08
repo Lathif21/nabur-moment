@@ -1,5 +1,5 @@
 // P2-04 "Done when": notes and stage changes appear newest first with author and time (WIB).
-// Also: the board card links to the booking page; the Pengiriman card saves.
+// Also: the board card links to the booking page; the Pengiriman card saves; the P3-01 schedule.
 // Dev branch only; removes the client and booking it made.
 import { expect, test, type Page } from '@playwright/test';
 import { eq, inArray, like } from 'drizzle-orm';
@@ -92,6 +92,12 @@ test('notes and stage changes show newest first with author and WIB time', async
 	await expect(page).toHaveURL(new RegExp(`/admin/booking/${bookingId}$`));
 	await expect(page.getByRole('heading', { level: 1, name: TITLE })).toBeVisible();
 	await expect(page.getByText('Masjid Raya')).toBeVisible();
+
+	// P3-01: the schedule, DP 50% + pelunasan due on Hari H
+	const schedule = page.getByRole('table', { name: 'Jadwal pembayaran' });
+	await expect(schedule.locator('tr[data-kind="dp"]')).toContainText(/3\.750\.000/);
+	await expect(schedule.locator('tr[data-kind="pelunasan"]')).toContainText(/3\.750\.000/);
+	await expect(schedule.locator('tr[data-kind="pelunasan"]')).toContainText('4 Apr 2032');
 	await page.waitForLoadState('networkidle');
 
 	// A note: empty is refused, then saved
