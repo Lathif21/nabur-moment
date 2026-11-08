@@ -2,9 +2,10 @@
 // Every function takes `db` or an open transaction first.
 import { and, asc, desc, eq, ilike, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
-import { activity, booking, client, leadSource, user } from '../db/schema/index.ts';
+import { activity, booking, client, leadSource } from '../db/schema/index.ts';
 import { phoneDisplay } from '../../format.ts';
 import type { ClientInput } from '../../schemas/crm.ts';
+import { listActivities } from './activity.ts';
 import { ServiceError } from './errors.ts';
 
 export type ClientFilter = { q?: string; sourceId?: string | null; archived?: boolean };
@@ -115,23 +116,7 @@ export async function getClient(db: DbOrTx, id: string) {
 		.where(eq(booking.clientId, id))
 		.orderBy(desc(booking.createdAt));
 
-	const activities = await db
-		.select({
-			id: activity.id,
-			type: activity.type,
-			body: activity.body,
-			meta: activity.meta,
-			occurredAt: activity.occurredAt,
-			bookingId: activity.bookingId,
-			bookingTitle: booking.title,
-			userName: user.name
-		})
-		.from(activity)
-		.leftJoin(booking, eq(booking.id, activity.bookingId))
-		.leftJoin(user, eq(user.id, activity.userId))
-		.where(eq(activity.clientId, id))
-		.orderBy(desc(activity.occurredAt), desc(activity.createdAt))
-		.limit(100);
+	const activities = await listActivities(db, { clientId: id }, 100);
 
 	// Payments arrive in Phase 3; until then "paid" is 0 and the outstanding total is the value
 	const value = bookings

@@ -1,6 +1,6 @@
 import { can } from '#lib/permissions.ts';
 import { bookingFilterSchema } from '#lib/schemas/crm.ts';
-import { createBookingAction, updateBookingAction } from '#lib/server/actions/bookings.ts';
+import { createBookingAction } from '#lib/server/actions/bookings.ts';
 import { db } from '#lib/server/db/index.ts';
 import { requirePerm } from '#lib/server/guards.ts';
 import { bookingFormOptions, listBookings } from '#lib/server/services/bookings.ts';
@@ -24,13 +24,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		options,
 		allow: {
 			create: can(perms, 'bookings', 'create'),
-			update: can(perms, 'bookings', 'update'),
 			newClient: can(perms, 'clients', 'create')
 		}
 	};
 };
 
 export const actions: Actions = {
-	create: createBookingAction,
-	update: updateBookingAction
+	create: createBookingAction
 };

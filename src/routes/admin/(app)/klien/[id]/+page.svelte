@@ -11,8 +11,9 @@
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import StatTile from '#lib/components/admin/StatTile.svelte';
+	import ActivityTimeline from '#lib/components/crm/ActivityTimeline.svelte';
 	import ClientDrawer from '#lib/components/crm/ClientDrawer.svelte';
-	import { ACTIVITY_LABEL, EVENT_TYPE_LABEL, STAGE_LABEL, igLink, waLink } from '#lib/crm.ts';
+	import { EVENT_TYPE_LABEL, STAGE_LABEL, igLink, stageTone, waLink } from '#lib/crm.ts';
 	import { dateID, phoneDisplay, rupiah, rupiahShort } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
@@ -21,22 +22,6 @@
 	const c = $derived(data.client);
 	let editOpen = $state(false);
 	let archiveOpen = $state(false);
-
-	const stageTone = (stage: string) =>
-		stage === 'lost'
-			? 'chip--danger'
-			: ['booked', 'preparation', 'event_day', 'editing', 'completed'].includes(stage)
-				? 'chip--success'
-				: '';
-
-	/** Stage changes read "Inquiry → Konsultasi" */
-	function activityText(a: (typeof data.activities)[number]) {
-		if (a.type === 'stage_change' && a.meta) {
-			const m = a.meta as { from?: keyof typeof STAGE_LABEL; to?: keyof typeof STAGE_LABEL };
-			if (m.from && m.to) return `${STAGE_LABEL[m.from]} → ${STAGE_LABEL[m.to]}`;
-		}
-		return a.body ?? '';
-	}
 </script>
 
 <div class="page-body">
@@ -130,7 +115,10 @@
 					{#each data.bookings as b (b.id)}
 						<li class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
 							<div class="min-w-0">
-								<p class="font-semibold">{b.title}</p>
+								<a
+									class="font-semibold underline-offset-2 hover:underline"
+									href={resolve('/admin/(app)/booking/[id]', { id: b.id })}>{b.title}</a
+								>
 								<p class="text-small text-ink-2">
 									{EVENT_TYPE_LABEL[b.eventType]} · {b.firstDate
 										? `Hari H ${dateID(b.firstDate)}`
@@ -154,27 +142,7 @@
 
 		<section class="flex flex-col gap-3" aria-labelledby="activity-title">
 			<h2 id="activity-title" class="font-display text-section-title">Aktivitas</h2>
-			{#if data.activities.length === 0}
-				<p class="text-body text-ink-2">Belum ada aktivitas.</p>
-			{:else}
-				<ol class="flex flex-col gap-3">
-					{#each data.activities as a (a.id)}
-						<li class="card px-4 py-3">
-							<p class="flex flex-wrap items-center gap-x-2 text-small text-ink-2">
-								<span class="chip">{ACTIVITY_LABEL[a.type] ?? a.type}</span>
-								<time datetime={new Date(a.occurredAt).toISOString()}>
-									{dateID(a.occurredAt, 'datetime')} WIB
-								</time>
-								<span>· {a.userName ?? 'Sistem'}</span>
-							</p>
-							{#if activityText(a)}<p class="mt-1.5 text-body whitespace-pre-line">
-									{activityText(a)}
-								</p>{/if}
-							{#if a.bookingTitle}<p class="mt-1 text-small text-ink-2">{a.bookingTitle}</p>{/if}
-						</li>
-					{/each}
-				</ol>
-			{/if}
+			<ActivityTimeline items={data.activities} showBooking label="Aktivitas klien" />
 		</section>
 	</div>
 </div>

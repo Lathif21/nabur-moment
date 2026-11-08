@@ -241,3 +241,30 @@ export const bookingFilterSchema = z.object({
 });
 
 export type BookingFilter = z.output<typeof bookingFilterSchema>;
+
+/** Activities a person writes on the booking page (the rest come from services) */
+export const MANUAL_ACTIVITY_TYPES = ['note', 'call', 'whatsapp', 'meeting'] as const;
+
+export const activitySchema = z.object({
+	bookingId: z.uuid(),
+	type: z.enum(MANUAL_ACTIVITY_TYPES, 'Pilih jenis aktivitas.'),
+	body: z.string().trim().min(1, 'Tulis isi catatan.').max(2000, 'Maksimal 2.000 karakter.')
+});
+
+export type ActivityInput = z.output<typeof activitySchema>;
+
+/** Pengiriman card: Google Drive (or any) link and the raw / edited delivery dates */
+export const deliverySchema = z.object({
+	id: z.uuid(),
+	deliveryLink: z
+		.string()
+		.trim()
+		.max(500)
+		.default('')
+		.refine((v) => v === '' || /^https?:\/\/\S+$/i.test(v), 'Link harus diawali https://')
+		.transform((v) => v || null),
+	rawDeliveredOn: isoDate,
+	editedDeliveredOn: isoDate
+});
+
+export type DeliveryInput = z.output<typeof deliverySchema>;

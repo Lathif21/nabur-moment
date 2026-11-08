@@ -1,9 +1,5 @@
 import { can } from '#lib/permissions.ts';
-import {
-	createBookingAction,
-	moveBookingAction,
-	updateBookingAction
-} from '#lib/server/actions/bookings.ts';
+import { createBookingAction, moveBookingAction } from '#lib/server/actions/bookings.ts';
 import { db } from '#lib/server/db/index.ts';
 import { requirePerm } from '#lib/server/guards.ts';
 import { bookingFormOptions, listBoard } from '#lib/server/services/bookings.ts';
@@ -28,6 +24,5 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	create: createBookingAction,
-	update: updateBookingAction,
 	move: moveBookingAction
 };

@@ -5,26 +5,18 @@
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import BookingDrawer from '#lib/components/crm/BookingDrawer.svelte';
-	import { EVENT_TYPES, EVENT_TYPE_LABEL, STAGES, STAGE_LABEL } from '#lib/crm.ts';
+	import { EVENT_TYPES, EVENT_TYPE_LABEL, STAGES, STAGE_LABEL, stageTone } from '#lib/crm.ts';
 	import { countdown, dateID, rupiah } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	let drawerOpen = $state(false);
-	let editingId = $state<string | null>(null);
 	const filtered = $derived(
 		!!(data.filter.q || data.filter.stage || data.filter.eventType || data.filter.month)
 	);
 	const submitOnChange = (e: Event & { currentTarget: HTMLSelectElement | HTMLInputElement }) =>
 		e.currentTarget.form?.requestSubmit();
-
-	const stageTone = (stage: string) =>
-		stage === 'lost'
-			? 'chip--danger'
-			: ['booked', 'preparation', 'event_day', 'editing', 'completed'].includes(stage)
-				? 'chip--success'
-				: '';
 </script>
 
 <div class="page-body">
@@ -34,14 +26,7 @@
 				<SquareKanban size={16} aria-hidden="true" /> Papan
 			</a>
 			{#if data.allow.create}
-				<button
-					type="button"
-					class="btn btn--primary"
-					onclick={() => {
-						editingId = null;
-						drawerOpen = true;
-					}}
-				>
+				<button type="button" class="btn btn--primary" onclick={() => (drawerOpen = true)}>
 					<Plus size={16} aria-hidden="true" /> Booking baru
 				</button>
 			{/if}
@@ -122,16 +107,10 @@
 					{#each data.rows as b (b.id)}
 						<tr>
 							<td>
-								{#if data.allow.update}
-									<button
-										type="button"
-										class="text-left font-semibold underline-offset-2 hover:underline"
-										onclick={() => {
-											editingId = b.id;
-											drawerOpen = true;
-										}}>{b.title}</button
-									>
-								{:else}<span class="font-semibold">{b.title}</span>{/if}
+								<a
+									class="font-semibold underline-offset-2 hover:underline"
+									href={resolve('/admin/(app)/booking/[id]', { id: b.id })}>{b.title}</a
+								>
 								<span class="block text-small text-ink-2">
 									{EVENT_TYPE_LABEL[b.eventType]}{b.packageName ? ` · ${b.packageName}` : ''} · {b.sessions}
 									sesi
@@ -168,7 +147,7 @@
 
 <BookingDrawer
 	bind:open={drawerOpen}
-	bookingId={editingId}
+	bookingId={null}
 	options={data.options}
 	allowNewClient={data.allow.newClient}
 />

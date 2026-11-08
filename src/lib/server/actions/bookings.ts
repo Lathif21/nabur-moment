@@ -1,12 +1,24 @@
-// Booking form actions shared by the board (/admin/booking) and the list (/admin/booking/daftar).
+// Booking form actions shared by the board (/admin/booking), the list (/admin/booking/daftar) and
+// the booking page (/admin/booking/[id]).
 import { fail, type RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 import { STAGE_LABEL } from '#lib/crm.ts';
 import { fieldErrors, formObject } from '#lib/schemas/access.ts';
-import { bookingMoveSchema, bookingSchema } from '#lib/schemas/crm.ts';
+import {
+	activitySchema,
+	bookingMoveSchema,
+	bookingSchema,
+	deliverySchema
+} from '#lib/schemas/crm.ts';
 import { db } from '#lib/server/db/index.ts';
 import { requirePerm } from '#lib/server/guards.ts';
-import { createBooking, moveBooking, updateBooking } from '#lib/server/services/bookings.ts';
+import { addBookingActivity } from '#lib/server/services/activity.ts';
+import {
+	createBooking,
+	moveBooking,
+	updateBooking,
+	updateDelivery
+} from '#lib/server/services/bookings.ts';
 import { ServiceError } from '#lib/server/services/errors.ts';
 
 type Event = Pick<RequestEvent, 'request' | 'locals'>;
@@ -63,6 +75,32 @@ export async function moveBookingAction({ request, locals }: Event) {
 	try {
 		const r = await moveBooking(db, parsed.data, me.id);
 		return { done: r.changed ? `Dipindahkan ke ${STAGE_LABEL[r.to]}.` : 'Urutan disimpan.' };
+	} catch (e) {
+		return serviceFail(e);
+	}
+}
+
+/** Booking page composer: note / call / WhatsApp / meeting */
+export async function addActivityAction({ request, locals }: Event) {
+	const me = requirePerm(locals, 'bookings', 'update');
+	const parsed = activitySchema.safeParse(formObject(await request.formData()));
+	if (!parsed.success) return fail(400, { fields: fieldErrors(parsed.error.issues) });
+	try {
+		await addBookingActivity(db, parsed.data, me.id);
+		return { done: 'Aktivitas dicatat.' };
+	} catch (e) {
+		return serviceFail(e);
+	}
+}
+
+/** Booking page Pengiriman card */
+export async function deliveryAction({ request, locals }: Event) {
+	requirePerm(locals, 'bookings', 'update');
+	const parsed = deliverySchema.safeParse(formObject(await request.formData()));
+	if (!parsed.success) return fail(400, { fields: fieldErrors(parsed.error.issues) });
+	try {
+		await updateDelivery(db, parsed.data);
+		return { done: 'Pengiriman disimpan.' };
 	} catch (e) {
 		return serviceFail(e);
 	}

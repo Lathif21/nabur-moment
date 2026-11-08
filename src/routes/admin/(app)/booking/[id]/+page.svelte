@@ -1,0 +1,463 @@
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
+	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import CalendarDays from '@lucide/svelte/icons/calendar-days';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import MapPin from '@lucide/svelte/icons/map-pin';
+	import MessageCircle from '@lucide/svelte/icons/message-circle';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import EmptyState from '#lib/components/admin/EmptyState.svelte';
+	import PageHeader from '#lib/components/admin/PageHeader.svelte';
+	import ActivityTimeline from '#lib/components/crm/ActivityTimeline.svelte';
+	import BookingDrawer from '#lib/components/crm/BookingDrawer.svelte';
+	import BookingMoveDialogs from '#lib/components/crm/BookingMoveDialogs.svelte';
+	import MoveMenu from '#lib/components/kanban/MoveMenu.svelte';
+	import {
+		ACTIVITY_LABEL,
+		EVENT_TYPE_LABEL,
+		STAGES,
+		STAGE_LABEL,
+		stageTone,
+		waLink
+	} from '#lib/crm.ts';
+	import { countdown, dateID, phoneDisplay, rupiah } from '#lib/format.ts';
+	import { MANUAL_ACTIVITY_TYPES } from '#lib/schemas/crm.ts';
+	import { toast } from '#lib/toast.ts';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+
+	const b = $derived(data.booking);
+	const open = $derived(b.stage !== 'lost' && b.stage !== 'completed');
+	const addonTotal = $derived(b.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0));
+	// Payments and expenses arrive in Phase 3 (P3-04, P3-06); until then nothing is recorded
+	const paid = 0;
+	const costs = 0;
+
+	// ---------- stage ----------
+	let dialogs: BookingMoveDialogs;
+	let moving = $state(false);
+	const targets = $derived(
+		STAGES.filter((s) => s.key !== b.stage).map((s) => ({ key: s.key, label: s.label }))
+	);
+	async function moveTo(to: string) {
+		moving = true;
+		try {
+			// No neighbours: the card goes to the bottom of the new column on the board
+			await dialogs.request(
+				{ id: b.id, from: b.stage, to, beforeId: null, afterId: null },
+				{ title: b.title, bookedAt: b.bookedAt }
+			);
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Booking gagal dipindahkan.');
+		} finally {
+			moving = false;
+		}
+	}
+
+	let editOpen = $state(false);
+
+	// ---------- activity composer ----------
+	let noteType = $state<(typeof MANUAL_ACTIVITY_TYPES)[number]>('note');
+	let noteBody = $state('');
+	let noteError = $state('');
+	let noteBusy = $state(false);
+
+	// ---------- delivery ----------
+	let deliveryErrors = $state<Record<string, string>>({});
+	let deliveryBusy = $state(false);
+
+	function timeRange(s: { startTime: string | null; endTime: string | null }) {
+		if (s.startTime && s.endTime) return `${s.startTime}–${s.endTime}`;
+		return s.startTime ?? (s.endTime ? `s.d. ${s.endTime}` : null);
+	}
+</script>
+
+<div class="page-body">
+	<a
+		class="inline-flex items-center gap-1.5 text-small text-ink-2 hover:underline"
+		href={resolve('admin/booking')}
+	>
+		<ArrowLeft size={14} aria-hidden="true" /> Pipeline booking
+	</a>
+
+	<PageHeader
+		title={b.title}
+		description="{EVENT_TYPE_LABEL[b.eventType]} · dibuat {dateID(b.createdAt)}{b.origin ===
+		'website_form'
+			? ' dari formulir website'
+			: ''}"
+	>
+		{#snippet actions()}
+			{#if data.allow.update}
+				<button type="button" class="btn btn--secondary" onclick={() => (editOpen = true)}>
+					<Pencil size={16} aria-hidden="true" /> Ubah
+				</button>
+				<MoveMenu
+					itemLabel={b.title}
+					{targets}
+					onmove={moveTo}
+					disabled={moving}
+					buttonText="Pindah tahap"
+				/>
+			{/if}
+		{/snippet}
+	</PageHeader>
+
+	<!-- Header facts: stage, Hari H, DP, client -->
+	<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-body" aria-label="Ringkasan booking">
+		<span class="chip {stageTone(b.stage)}" data-testid="stage">{STAGE_LABEL[b.stage]}</span>
+		<span class="inline-flex items-center gap-1.5">
+			<CalendarDays size={16} class="text-ink-2" aria-hidden="true" />
+			{#if b.firstDate}
+				Hari H {dateID(b.firstDate, 'long')}
+				{#if open}<strong>{countdown(b.firstDate)}</strong>{/if}
+			{:else}
+				<span class="text-ink-2">Tanggal belum ditentukan</span>
+			{/if}
+		</span>
+		{#if b.stage !== 'lost'}
+			{#if b.bookedAt}
+				<span class="chip chip--success">DP lunas {dateID(b.bookedAt)}</span>
+			{:else}
+				<span class="chip chip--warning">Belum DP</span>
+			{/if}
+		{/if}
+		<span class="inline-flex flex-wrap items-center gap-2">
+			<a
+				class="font-semibold underline-offset-2 hover:underline"
+				href={resolve('/admin/(app)/klien/[id]', { id: b.client.id })}>{b.client.name}</a
+			>
+			{#if b.client.phone}
+				<!-- eslint-disable svelte/no-navigation-without-resolve -- external WhatsApp link -->
+				<a
+					class="inline-flex items-center gap-1 text-small text-ink-2 underline-offset-2 hover:underline"
+					href={waLink(b.client.phone)}
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<MessageCircle size={14} aria-hidden="true" />
+					{phoneDisplay(b.client.phone)}
+				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
+			{/if}
+		</span>
+	</div>
+
+	{#if b.stage === 'lost' && b.lostReason}
+		<p class="rounded-card border border-line bg-danger-bg px-4 py-3 text-body" role="status">
+			<strong>Batal.</strong>
+			{b.lostReason}
+		</p>
+	{/if}
+
+	<div class="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+		<!-- Main column -->
+		<div class="flex min-w-0 flex-col gap-6">
+			<section class="flex flex-col gap-3" aria-labelledby="sessions-title">
+				<h2 id="sessions-title" class="font-display text-section-title">Sesi</h2>
+				{#if b.sessions.length === 0}
+					<EmptyState message="Belum ada sesi." />
+				{:else}
+					<ul class="card divide-y divide-line">
+						{#each b.sessions as s, i (s.id)}
+							<li class="flex flex-col gap-1 px-4 py-3">
+								<p class="flex flex-wrap items-center gap-2">
+									<span class="font-semibold">{EVENT_TYPE_LABEL[s.eventType]}</span>
+									{#if i === 0 && s.date}<span class="chip">Hari H</span>{/if}
+								</p>
+								<p class="text-body">
+									{s.date ? dateID(s.date, 'long') : 'Tanggal belum ditentukan'}{#if timeRange(s)}
+										· {timeRange(s)} WIB{/if}
+								</p>
+								{#if s.venue || s.city}
+									<p class="inline-flex items-center gap-1.5 text-small text-ink-2">
+										<MapPin size={14} aria-hidden="true" />
+										{[s.venue, s.city].filter(Boolean).join(', ')}
+									</p>
+								{/if}
+								{#if s.notes}<p class="text-small whitespace-pre-line text-ink-2">{s.notes}</p>{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
+
+			<section class="flex flex-col gap-3" aria-labelledby="package-title">
+				<h2 id="package-title" class="font-display text-section-title">Paket & add-on</h2>
+				<div class="card flex flex-col gap-3 px-4 py-3">
+					{#if b.packageSnapshot}
+						<div class="flex flex-wrap items-baseline justify-between gap-2">
+							<p>
+								<span class="font-semibold">{b.packageSnapshot.name}</span>
+								{#if b.packageSnapshot.category}<span class="text-small text-ink-2">
+										· {b.packageSnapshot.category}</span
+									>{/if}
+							</p>
+							<span class="tabular-nums">{rupiah(b.packageSnapshot.price)}</span>
+						</div>
+						{#if b.packageSnapshot.inclusions.length}
+							<ul class="list-disc pl-5 text-small text-ink-2">
+								{#each b.packageSnapshot.inclusions as item, i (i)}<li>{item}</li>{/each}
+							</ul>
+						{/if}
+					{:else}
+						<p class="text-body text-ink-2">Tanpa paket.</p>
+					{/if}
+					{#if b.addons.length}
+						<ul class="flex flex-col gap-1 border-t border-line pt-3">
+							{#each b.addons as a (a.id)}
+								<li class="flex justify-between gap-3 text-body">
+									<span>{a.name}{a.qty > 1 ? ` × ${a.qty}` : ''}</span>
+									<span class="tabular-nums">{rupiah(a.unitPrice * a.qty)}</span>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					<p class="flex justify-between gap-3 border-t border-line pt-3 font-semibold">
+						<span>Harga disepakati</span>
+						<span class="tabular-nums">{rupiah(b.agreedPrice)}</span>
+					</p>
+					{#if b.packageSnapshot && b.agreedPrice !== b.packageSnapshot.price + addonTotal}
+						<p class="text-small text-ink-2">
+							Harga diubah manual (paket + add-on = {rupiah(b.packageSnapshot.price + addonTotal)}).
+						</p>
+					{/if}
+				</div>
+			</section>
+
+			<section class="flex flex-col gap-3" aria-labelledby="payments-title">
+				<h2 id="payments-title" class="font-display text-section-title">Pembayaran</h2>
+				<div class="card px-4 py-3 text-body text-ink-2">
+					Jadwal DP 50% + pelunasan, invoice, dan kwitansi muncul di sini setelah modul Keuangan
+					aktif.
+				</div>
+			</section>
+
+			<section class="flex flex-col gap-3" aria-labelledby="costs-title">
+				<h2 id="costs-title" class="font-display text-section-title">Biaya</h2>
+				<div class="card px-4 py-3 text-body text-ink-2">
+					Biaya langsung untuk booking ini (kru, transport, sewa alat) dicatat di sini setelah modul
+					Pengeluaran aktif.
+				</div>
+			</section>
+
+			<section class="flex flex-col gap-3" aria-labelledby="delivery-title">
+				<h2 id="delivery-title" class="font-display text-section-title">Pengiriman</h2>
+				{#if data.allow.update}
+					<form
+						method="post"
+						action="?/delivery"
+						class="card flex flex-col gap-3 px-4 py-3"
+						novalidate
+						use:enhance={() => {
+							deliveryBusy = true;
+							return async ({ result, update }) => {
+								deliveryBusy = false;
+								if (result.type === 'failure') {
+									deliveryErrors = (result.data?.fields ?? {}) as Record<string, string>;
+									toast.error(String(result.data?.error ?? 'Periksa lagi isian pengiriman.'));
+									return;
+								}
+								if (result.type !== 'success') return;
+								deliveryErrors = {};
+								await update({ reset: false });
+								toast.success(String(result.data?.done));
+							};
+						}}
+					>
+						<input type="hidden" name="id" value={b.id} />
+						<div class="field">
+							<label for="delivery-link">Link hasil (Google Drive)</label>
+							<input
+								id="delivery-link"
+								name="deliveryLink"
+								type="url"
+								class="input"
+								placeholder="https://drive.google.com/…"
+								defaultValue={b.deliveryLink ?? ''}
+								aria-invalid={deliveryErrors.deliveryLink ? 'true' : undefined}
+								aria-describedby={deliveryErrors.deliveryLink ? 'delivery-link-error' : undefined}
+							/>
+							{#if deliveryErrors.deliveryLink}<p id="delivery-link-error" class="field__error">
+									{deliveryErrors.deliveryLink}
+								</p>{/if}
+						</div>
+						<div class="grid gap-3 sm:grid-cols-2">
+							<div class="field">
+								<label for="raw-delivered">Raw dikirim</label>
+								<input
+									id="raw-delivered"
+									name="rawDeliveredOn"
+									type="date"
+									class="input"
+									defaultValue={b.rawDeliveredOn ?? ''}
+								/>
+							</div>
+							<div class="field">
+								<label for="edited-delivered">Edited dikirim</label>
+								<input
+									id="edited-delivered"
+									name="editedDeliveredOn"
+									type="date"
+									class="input"
+									defaultValue={b.editedDeliveredOn ?? ''}
+								/>
+							</div>
+						</div>
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							{#if b.deliveryLink}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- external delivery link -->
+								<a
+									class="inline-flex items-center gap-1.5 text-small underline-offset-2 hover:underline"
+									href={b.deliveryLink}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									<ExternalLink size={14} aria-hidden="true" /> Buka link hasil
+								</a>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
+							{:else}<span></span>{/if}
+							<button type="submit" class="btn btn--secondary" disabled={deliveryBusy}>
+								{deliveryBusy ? 'Menyimpan…' : 'Simpan pengiriman'}
+							</button>
+						</div>
+					</form>
+				{:else}
+					<dl class="card grid gap-2 px-4 py-3 text-body sm:grid-cols-3">
+						<div>
+							<dt class="text-small text-ink-2">Link hasil</dt>
+							<dd class="break-all">{b.deliveryLink ?? '–'}</dd>
+						</div>
+						<div>
+							<dt class="text-small text-ink-2">Raw dikirim</dt>
+							<dd>{b.rawDeliveredOn ? dateID(b.rawDeliveredOn) : '–'}</dd>
+						</div>
+						<div>
+							<dt class="text-small text-ink-2">Edited dikirim</dt>
+							<dd>{b.editedDeliveredOn ? dateID(b.editedDeliveredOn) : '–'}</dd>
+						</div>
+					</dl>
+				{/if}
+			</section>
+
+			{#if b.notes || b.inquiryMessage}
+				<section class="flex flex-col gap-3" aria-labelledby="notes-title">
+					<h2 id="notes-title" class="font-display text-section-title">Catatan</h2>
+					{#if b.inquiryMessage}
+						<div class="card px-4 py-3">
+							<p class="text-small font-semibold text-ink-2">Pesan dari formulir website</p>
+							<p class="mt-1 text-body whitespace-pre-line">{b.inquiryMessage}</p>
+						</div>
+					{/if}
+					{#if b.notes}<p class="card px-4 py-3 text-body whitespace-pre-line">{b.notes}</p>{/if}
+				</section>
+			{/if}
+		</div>
+
+		<!-- Side column -->
+		<div class="flex min-w-0 flex-col gap-6">
+			<section class="flex flex-col gap-3" aria-labelledby="summary-title">
+				<h2 id="summary-title" class="font-display text-section-title">Ringkasan</h2>
+				<dl class="card divide-y divide-line text-body">
+					<div class="flex justify-between gap-3 px-4 py-2.5">
+						<dt>Harga</dt>
+						<dd class="tabular-nums">{rupiah(b.agreedPrice)}</dd>
+					</div>
+					<div class="flex justify-between gap-3 px-4 py-2.5">
+						<dt>Dibayar</dt>
+						<dd class="tabular-nums">{rupiah(paid)}</dd>
+					</div>
+					<div class="flex justify-between gap-3 px-4 py-2.5">
+						<dt>Sisa</dt>
+						<dd class="tabular-nums">{rupiah(b.stage === 'lost' ? 0 : b.agreedPrice - paid)}</dd>
+					</div>
+					<div class="flex justify-between gap-3 px-4 py-2.5">
+						<dt>Biaya</dt>
+						<dd class="tabular-nums">{rupiah(costs)}</dd>
+					</div>
+					<div class="flex justify-between gap-3 px-4 py-2.5 font-semibold">
+						<dt>Laba</dt>
+						<dd class="tabular-nums">{rupiah(paid - costs)}</dd>
+					</div>
+				</dl>
+				<p class="text-small text-ink-2">Laba = pembayaran masuk − biaya.</p>
+			</section>
+
+			<section class="flex flex-col gap-3" aria-labelledby="activity-title">
+				<h2 id="activity-title" class="font-display text-section-title">Aktivitas</h2>
+				{#if data.allow.update}
+					<form
+						method="post"
+						action="?/activity"
+						class="card flex flex-col gap-3 px-4 py-3"
+						novalidate
+						use:enhance={({ cancel }) => {
+							if (!noteBody.trim()) {
+								noteError = 'Tulis isi catatan.';
+								cancel();
+								return;
+							}
+							noteBusy = true;
+							return async ({ result, update }) => {
+								noteBusy = false;
+								if (result.type === 'failure') {
+									const fields = (result.data?.fields ?? {}) as Record<string, string>;
+									noteError = fields.body ?? String(result.data?.error ?? 'Gagal menyimpan.');
+									return;
+								}
+								if (result.type !== 'success') return;
+								noteBody = '';
+								noteError = '';
+								await update({ reset: false });
+								toast.success(String(result.data?.done));
+							};
+						}}
+					>
+						<input type="hidden" name="bookingId" value={b.id} />
+						<div class="field">
+							<label for="activity-type">Jenis</label>
+							<select id="activity-type" name="type" class="input" bind:value={noteType}>
+								{#each MANUAL_ACTIVITY_TYPES as t (t)}
+									<option value={t}>{ACTIVITY_LABEL[t]}</option>
+								{/each}
+							</select>
+						</div>
+						<div class="field">
+							<label for="activity-body">Isi</label>
+							<textarea
+								id="activity-body"
+								name="body"
+								class="input min-h-24"
+								maxlength="2000"
+								placeholder="Mis. sudah kirim pricelist, klien minta jadwal konsultasi Sabtu."
+								bind:value={noteBody}
+								oninput={() => (noteError = '')}
+								aria-invalid={noteError ? 'true' : undefined}
+								aria-describedby={noteError ? 'activity-body-error' : undefined}></textarea>
+							{#if noteError}<p id="activity-body-error" class="field__error">{noteError}</p>{/if}
+						</div>
+						<div class="flex justify-end">
+							<button type="submit" class="btn btn--primary" disabled={noteBusy}>
+								{noteBusy ? 'Menyimpan…' : 'Simpan aktivitas'}
+							</button>
+						</div>
+					</form>
+				{/if}
+				<ActivityTimeline items={data.activities} label="Aktivitas booking" />
+			</section>
+		</div>
+	</div>
+</div>
+
+{#if data.allow.update && data.options}
+	<BookingDrawer
+		bind:open={editOpen}
+		bookingId={b.id}
+		options={data.options}
+		allowNewClient={data.allow.newClient}
+	/>
+{/if}
+
+<BookingMoveDialogs bind:this={dialogs} allowPayments={data.allow.payments} />

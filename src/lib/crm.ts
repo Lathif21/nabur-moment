@@ -28,6 +28,10 @@ export const BOOKED_STAGES: readonly Stage[] = [
 	'completed'
 ];
 
+/** Chip tone for a stage: Batal red, Booked onwards green, the open stages neutral */
+export const stageTone = (stage: Stage) =>
+	stage === 'lost' ? 'chip--danger' : BOOKED_STAGES.includes(stage) ? 'chip--success' : '';
+
 export const EVENT_TYPES = [
 	{ key: 'wedding', label: 'Wedding' },
 	{ key: 'akad', label: 'Akad' },

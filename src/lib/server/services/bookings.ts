@@ -16,7 +16,12 @@ import {
 } from '../db/schema/index.ts';
 import { BOOKED_STAGES, STAGE_LABEL, type EventType, type Stage } from '../../crm.ts';
 import { dayKeyWib, rupiah } from '../../format.ts';
-import type { BookingFilter, BookingInput, BookingMoveInput } from '../../schemas/crm.ts';
+import type {
+	BookingFilter,
+	BookingInput,
+	BookingMoveInput,
+	DeliveryInput
+} from '../../schemas/crm.ts';
 import { findClientByPhone } from './clients.ts';
 import { ServiceError } from './errors.ts';
 
@@ -225,6 +230,70 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 }
 
 export type BookingForEdit = NonNullable<Awaited<ReturnType<typeof getBookingForEdit>>>;
+
+/** Booking page (03-SCREENS B4): the booking, its client's contacts, sessions and add-on lines */
+export async function getBookingDetail(db: DbOrTx, id: string) {
+	const [row] = await db
+		.select({
+			id: booking.id,
+			title: booking.title,
+			stage: booking.stage,
+			eventType: booking.eventType,
+			origin: booking.origin,
+			inquiryMessage: booking.inquiryMessage,
+			lostReason: booking.lostReason,
+			packageSnapshot: booking.packageSnapshot,
+			agreedPrice: booking.agreedPrice,
+			bookedAt: booking.bookedAt,
+			stageChangedAt: booking.stageChangedAt,
+			deliveryLink: booking.deliveryLink,
+			rawDeliveredOn: booking.rawDeliveredOn,
+			editedDeliveredOn: booking.editedDeliveredOn,
+			notes: booking.notes,
+			createdAt: booking.createdAt,
+			firstDate: firstDateSql,
+			client: {
+				id: client.id,
+				name: client.name,
+				phone: client.phone,
+				instagram: client.instagram,
+				email: client.email
+			}
+		})
+		.from(booking)
+		.innerJoin(client, eq(client.id, booking.clientId))
+		.where(eq(booking.id, id));
+	if (!row) return null;
+	const [sessions, addons] = await Promise.all([
+		db
+			.select({
+				id: bookingSession.id,
+				eventType: bookingSession.eventType,
+				date: bookingSession.date,
+				startTime: bookingSession.startTime,
+				endTime: bookingSession.endTime,
+				venue: bookingSession.venue,
+				city: bookingSession.city,
+				notes: bookingSession.notes
+			})
+			.from(bookingSession)
+			.where(eq(bookingSession.bookingId, id))
+			.orderBy(sql`${bookingSession.date} asc nulls last`, asc(bookingSession.sort)),
+		db
+			.select({
+				id: bookingAddon.id,
+				name: bookingAddon.name,
+				unitPrice: bookingAddon.unitPrice,
+				qty: bookingAddon.qty
+			})
+			.from(bookingAddon)
+			.where(eq(bookingAddon.bookingId, id))
+			.orderBy(asc(bookingAddon.createdAt))
+	]);
+	return { ...row, sessions, addons };
+}
+
+export type BookingDetail = NonNullable<Awaited<ReturnType<typeof getBookingDetail>>>;
 
 /** Packages (visible or not: hidden ones stay selectable) and active add-ons for the form */
 export async function bookingFormOptions(db: DbOrTx) {
@@ -462,6 +531,21 @@ export async function updateBooking(
 		await writeLines(tx, id, input);
 		return { id, clientId };
 	});
+}
+
+/** Pengiriman card: link + raw / edited delivery dates */
+export async function updateDelivery(db: DbOrTx, input: DeliveryInput) {
+	const [row] = await db
+		.update(booking)
+		.set({
+			deliveryLink: input.deliveryLink,
+			rawDeliveredOn: input.rawDeliveredOn,
+			editedDeliveredOn: input.editedDeliveredOn
+		})
+		.where(eq(booking.id, input.id))
+		.returning({ id: booking.id });
+	if (!row) throw new ServiceError('Booking tidak ditemukan.');
+	return row;
 }
 
 /** Money received for a booking. Payments arrive in P3-04; until then nothing is paid. */
