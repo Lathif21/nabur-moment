@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb } from '../db/client';
 import { media, mediaUsage } from '../db/schema/index';
-import { neonStorage, SITE_BUCKET, storageConfig } from '../storage/files';
+import { neonStorage, PRIVATE_BUCKET, SITE_BUCKET, storageConfig } from '../storage/files';
 import { ServiceError } from './errors';
 import {
 	confirmUpload,
@@ -12,6 +12,7 @@ import {
 	createUpload,
 	deleteMedia,
 	listMedia,
+	mediaByIds,
 	syncUsage,
 	updateMedia
 } from './media';
@@ -121,5 +122,28 @@ describe.runIf(ready)('media library on the dev bucket', () => {
 			embedUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
 			status: 'ready'
 		});
+	});
+
+	it('keeps private-bucket rows (payment proofs) out of the library', async () => {
+		const [proof] = await db
+			.insert(media)
+			.values({
+				kind: 'image',
+				bucket: PRIVATE_BUCKET,
+				key: `proofs/spec-${Date.now()}/proof.jpg`,
+				variants: [],
+				filename: 'bukti.jpg',
+				status: 'ready'
+			})
+			.returning();
+		try {
+			expect((await listMedia(db, { limit: 200 })).some((m) => m.id === proof.id)).toBe(false);
+			expect(await mediaByIds(db, [proof.id])).toHaveLength(0);
+			await expect(updateMedia(db, proof.id, { alt: 'x' })).rejects.toBeInstanceOf(ServiceError);
+			await expect(deleteMedia(db, storage, proof.id)).rejects.toBeInstanceOf(ServiceError);
+			expect(await db.select().from(media).where(eq(media.id, proof.id))).toHaveLength(1);
+		} finally {
+			await db.delete(media).where(eq(media.id, proof.id));
+		}
 	});
 });

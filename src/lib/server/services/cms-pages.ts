@@ -15,7 +15,7 @@ import {
 import type { DbOrTx } from '../db/client.ts';
 import { media, pageSection } from '../db/schema/index.ts';
 import { ServiceError } from './errors.ts';
-import { syncUsage } from './media.ts';
+import { isLibraryMedia, syncUsage } from './media.ts';
 
 const OWNER = 'page_section';
 const ownerId = (page: string, key: string) => `${page}:${key}`;
@@ -178,7 +178,7 @@ async function assertAltText(db: DbOrTx, def: SectionDef, data: Record<string, u
 	const rows = await db
 		.select({ id: media.id, kind: media.kind, alt: media.alt, filename: media.filename })
 		.from(media)
-		.where(inArray(media.id, ids));
+		.where(and(inArray(media.id, ids), isLibraryMedia));
 	if (rows.length !== ids.length)
 		throw new ServiceError(`${def.label}: ada media yang sudah dihapus. Pilih ulang.`);
 	const missing = rows.filter((m) => m.kind === 'image' && !m.alt.trim());

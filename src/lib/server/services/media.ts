@@ -1,7 +1,7 @@
 // Media library (docs/04-ARCHITECTURE.md → Media). The browser uploads straight to the bucket with
 // presigned PUTs; the server never streams file bytes. Relative imports only.
 import { randomUUID } from 'node:crypto';
-import { and, count, desc, eq, inArray, lt, notExists, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, lt, notExists, or, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
 import { media, mediaUsage, type ImageVariant } from '../db/schema/index.ts';
 import { type FileStorage, SITE_BUCKET } from '../storage/files.ts';
@@ -181,6 +181,13 @@ export async function createEmbed(db: DbOrTx, input: { url: string }, userId: st
 	return row;
 }
 
+/**
+ * Library items: files in the public site bucket, and embeds (no bucket). Other rows, such as
+ * payment proofs in the private bucket (services/payment-proofs.ts), never show in the library or
+ * the pickers, cannot go on a page, and cannot be edited or deleted from here.
+ */
+export const isLibraryMedia = or(isNull(media.bucket), eq(media.bucket, SITE_BUCKET))!;
+
 const usageCount = (db: DbOrTx) =>
 	db.$count(mediaUsage, eq(mediaUsage.mediaId, media.id)).as('usage');
 
@@ -211,7 +218,7 @@ export async function mediaByIds(db: DbOrTx, ids: string[]) {
 	return db
 		.select(columns(db))
 		.from(media)
-		.where(and(inArray(media.id, [...new Set(ids)]), eq(media.status, 'ready')));
+		.where(and(inArray(media.id, [...new Set(ids)]), eq(media.status, 'ready'), isLibraryMedia));
 }
 
 /** The library grid: ready items, newest first, optionally one kind or only unused ones */
@@ -219,7 +226,7 @@ export async function listMedia(
 	db: DbOrTx,
 	opts: { kind?: 'image' | 'video' | 'embed'; unused?: boolean; limit?: number; before?: Date } = {}
 ) {
-	const where = [eq(media.status, 'ready')];
+	const where = [eq(media.status, 'ready'), isLibraryMedia];
 	if (opts.kind) where.push(eq(media.kind, opts.kind));
 	if (opts.before) where.push(lt(media.createdAt, opts.before));
 	if (opts.unused)
@@ -252,7 +259,11 @@ export async function updateMedia(
 		if (!(v >= 0 && v <= 1)) throw new ServiceError('Titik fokus harus di antara 0 dan 1.');
 		patch[k] = v;
 	}
-	const done = await db.update(media).set(patch).where(eq(media.id, id)).returning();
+	const done = await db
+		.update(media)
+		.set(patch)
+		.where(and(eq(media.id, id), isLibraryMedia))
+		.returning();
 	if (!done.length) throw new ServiceError('Media tidak ditemukan.');
 	return done[0];
 }
@@ -275,7 +286,11 @@ export function mediaUsageOf(db: DbOrTx, id: string) {
  */
 export async function deleteMedia(db: DbOrTx, storage: FileStorage, id: string) {
 	const row = await db.transaction(async (tx) => {
-		const [found] = await tx.select().from(media).where(eq(media.id, id)).for('update');
+		const [found] = await tx
+			.select()
+			.from(media)
+			.where(and(eq(media.id, id), isLibraryMedia))
+			.for('update');
 		if (!found) throw new ServiceError('Media tidak ditemukan.');
 		const [{ n }] = await tx
 			.select({ n: count() })
