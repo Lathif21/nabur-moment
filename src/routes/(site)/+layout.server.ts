@@ -14,12 +14,15 @@ import type { LayoutServerLoad } from './$types';
  * Public pages are cached on Vercel (ISR). Terbitkan refreshes them at once through the bypass
  * token (#lib/server/revalidate.ts); the hour is only a backstop. Logged-in admins carry the
  * `__prerender_bypass` cookie (set at login), so they always get a fresh page, drafts in preview.
- * Query strings are ignored by the cache (the portfolio filter runs in the browser).
+ * Vercel strips query strings before an ISR function sees them, except those in `allowQuery`:
+ * `preview` must pass for the admin's draft preview (each value is its own cache entry; visitors
+ * only ever get the published render there, see isPreview). The portfolio filter runs in the browser.
  */
 export const config = {
 	isr: {
 		expiration: 3600,
-		bypassToken: process.env.ISR_BYPASS_TOKEN || undefined
+		bypassToken: process.env.ISR_BYPASS_TOKEN || undefined,
+		allowQuery: ['preview']
 	}
 };
 

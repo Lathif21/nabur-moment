@@ -4,11 +4,11 @@ import type { Cookies } from '@sveltejs/kit';
 import { dev } from '$app/env';
 import { ISR_BYPASS_TOKEN } from '$app/env/private';
 
-const COOKIE = '__prerender_bypass';
+export const ISR_BYPASS_COOKIE = '__prerender_bypass';
 
 export function setIsrBypass(cookies: Cookies) {
 	if (!ISR_BYPASS_TOKEN) return;
-	cookies.set(COOKIE, ISR_BYPASS_TOKEN, {
+	cookies.set(ISR_BYPASS_COOKIE, ISR_BYPASS_TOKEN, {
 		path: '/',
 		httpOnly: true,
 		secure: !dev,
@@ -18,5 +18,5 @@ export function setIsrBypass(cookies: Cookies) {
 }
 
 export function clearIsrBypass(cookies: Cookies) {
-	cookies.delete(COOKIE, { path: '/' });
+	cookies.delete(ISR_BYPASS_COOKIE, { path: '/' });
 }

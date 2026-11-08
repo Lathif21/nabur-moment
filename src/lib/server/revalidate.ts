@@ -17,7 +17,14 @@ export async function revalidate(paths: string[]) {
 	const headers: Record<string, string> = { 'x-prerender-revalidate': token };
 	if (!PUBLIC_SITE_URL && VERCEL_AUTOMATION_BYPASS_SECRET)
 		headers['x-vercel-protection-bypass'] = VERCEL_AUTOMATION_BYPASS_SECRET;
-	await Promise.allSettled(
-		paths.map((p) => fetch(new URL('/' + p, site), { method: 'HEAD', headers }))
+	const results = await Promise.allSettled(
+		paths.map((p) => fetch(new URL('/' + p, site), { method: 'HEAD', headers, redirect: 'manual' }))
 	);
+	// Publishing still succeeds; the hourly expiry is the backstop. Logged for Vercel's runtime logs.
+	results.forEach((r, i) => {
+		const status = r.status === 'fulfilled' ? r.value.status : String(r.reason);
+		const cache = r.status === 'fulfilled' ? r.value.headers.get('x-vercel-cache') : null;
+		if (r.status === 'rejected' || r.value.status >= 300 || cache !== 'REVALIDATED')
+			console.warn(`revalidate /${paths[i]}: ${status} cache=${cache}`);
+	});
 }
