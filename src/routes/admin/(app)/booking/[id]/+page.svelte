@@ -7,6 +7,7 @@
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import Plus from '@lucide/svelte/icons/plus';
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import ActivityTimeline from '#lib/components/crm/ActivityTimeline.svelte';
@@ -21,7 +22,14 @@
 		stageTone,
 		waLink
 	} from '#lib/crm.ts';
-	import { DP_PERCENT, INSTALLMENT_LABEL } from '#lib/finance.ts';
+	import CustomInvoiceDrawer from '#lib/components/finance/CustomInvoiceDrawer.svelte';
+	import InstallmentInvoiceModal from '#lib/components/finance/InstallmentInvoiceModal.svelte';
+	import {
+		DP_PERCENT,
+		INSTALLMENT_LABEL,
+		INVOICE_STATUS_LABEL,
+		invoiceTone
+	} from '#lib/finance.ts';
 	import { countdown, dateID, phoneDisplay, rupiah } from '#lib/format.ts';
 	import { MANUAL_ACTIVITY_TYPES } from '#lib/schemas/crm.ts';
 	import { toast } from '#lib/toast.ts';
@@ -58,6 +66,23 @@
 	}
 
 	let editOpen = $state(false);
+
+	// ---------- invoices (P3-02) ----------
+	const activeInvoice = (installmentId: string) =>
+		data.invoices.find((i) => i.installmentId === installmentId && i.status !== 'void');
+	const canBill = (row: (typeof data.schedule)[number]) =>
+		data.allow.invoices.create &&
+		b.stage !== 'lost' &&
+		!row.cancelledAt &&
+		row.amount > 0 &&
+		!(row.kind === 'dp' && b.bookedAt);
+	let billing = $state<(typeof data.schedule)[number] | null>(null);
+	let installmentOpen = $state(false);
+	let customOpen = $state(false);
+	function openInstallmentInvoice(row: (typeof data.schedule)[number]) {
+		billing = row;
+		installmentOpen = true;
+	}
 
 	/** Until payments exist (P3-04) the DP counts as paid once the booking has `booked_at` */
 	function installmentStatus(row: (typeof data.schedule)[number]) {
@@ -245,10 +270,12 @@
 								<th scope="col">Jatuh tempo</th>
 								<th scope="col" class="text-right">Jumlah</th>
 								<th scope="col">Status</th>
+								<th scope="col">Invoice</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each data.schedule as row (row.id)}
+								{@const inv = activeInvoice(row.id)}
 								{@const status = installmentStatus(row)}
 								<tr data-kind={row.kind}>
 									<td class="font-semibold">{INSTALLMENT_LABEL[row.kind]}</td>
@@ -269,6 +296,24 @@
 										]}>{rupiah(row.amount)}</td
 									>
 									<td><span class="chip {status.tone}">{status.label}</span></td>
+									<td>
+										{#if inv}
+											{#if data.allow.invoices.read}
+												<a
+													class="underline-offset-2 hover:underline"
+													href={resolve('/admin/(app)/keuangan/invoice/[id]', { id: inv.id })}
+													>{inv.number}</a
+												>
+											{:else}{inv.number}{/if}
+										{:else if canBill(row)}
+											<button
+												type="button"
+												class="btn btn--secondary"
+												onclick={() => openInstallmentInvoice(row)}
+												aria-label="Buat invoice {INSTALLMENT_LABEL[row.kind]}">Buat invoice</button
+											>
+										{:else}<span class="text-ink-2">–</span>{/if}
+									</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -276,9 +321,62 @@
 				</div>
 				<p class="text-small text-ink-2">
 					DP {DP_PERCENT}% tetap dari harga disepakati; pelunasan jatuh tempo di Hari H dan ikut
-					berubah bila harga atau tanggal sesi berubah. Invoice dan kwitansi muncul di sini setelah
-					modul Invoice dan Pembayaran aktif.
+					berubah bila harga atau tanggal sesi berubah. Kwitansi muncul di sini setelah modul
+					Pembayaran aktif.
 				</p>
+
+				<div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+					<h3 class="font-semibold">Invoice</h3>
+					{#if data.allow.invoices.create && b.stage !== 'lost'}
+						<button type="button" class="btn btn--secondary" onclick={() => (customOpen = true)}>
+							<Plus size={16} aria-hidden="true" /> Invoice lain
+						</button>
+					{/if}
+				</div>
+				{#if data.invoices.length === 0}
+					<p class="text-body text-ink-2">Belum ada invoice.</p>
+				{:else}
+					<div class="card table-wrap">
+						<table class="table" aria-label="Invoice booking">
+							<thead>
+								<tr>
+									<th scope="col">Nomor</th>
+									<th scope="col">Termin</th>
+									<th scope="col">Jatuh tempo</th>
+									<th scope="col" class="text-right">Total</th>
+									<th scope="col">Status</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.invoices as inv (inv.id)}
+									<tr>
+										<td class="whitespace-nowrap">
+											{#if data.allow.invoices.read}
+												<a
+													class="font-semibold underline-offset-2 hover:underline"
+													href={resolve('/admin/(app)/keuangan/invoice/[id]', { id: inv.id })}
+													>{inv.number}</a
+												>
+											{:else}<span class="font-semibold">{inv.number}</span>{/if}
+										</td>
+										<td
+											>{inv.installmentKind
+												? INSTALLMENT_LABEL[inv.installmentKind]
+												: 'Lainnya'}</td
+										>
+										<td class="whitespace-nowrap">{dateID(inv.dueDate)}</td>
+										<td class="text-right tabular-nums">{rupiah(inv.total)}</td>
+										<td
+											><span class="chip {invoiceTone(inv.status)}"
+												>{INVOICE_STATUS_LABEL[inv.status]}</span
+											></td
+										>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 			</section>
 
 			<section class="flex flex-col gap-3" aria-labelledby="costs-title">
@@ -507,3 +605,12 @@
 {/if}
 
 <BookingMoveDialogs bind:this={dialogs} allowPayments={data.allow.payments} />
+
+{#if data.allow.invoices.create}
+	<InstallmentInvoiceModal
+		bind:open={installmentOpen}
+		installment={billing}
+		bookingTitle={b.title}
+	/>
+	<CustomInvoiceDrawer bind:open={customOpen} bookingId={b.id} bookingTitle={b.title} />
+{/if}

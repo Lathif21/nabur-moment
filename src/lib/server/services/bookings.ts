@@ -25,6 +25,7 @@ import type {
 import { findClientByPhone } from './clients.ts';
 import { ServiceError } from './errors.ts';
 import { ensureSchedule } from './installments.ts';
+import { voidUnpaidInvoices } from './invoices.ts';
 
 /** ServiceError fields the board reacts to with a modal */
 export const MOVE_NEEDS = {
@@ -616,8 +617,22 @@ export async function moveBooking(db: DbOrTx, input: BookingMoveInput, userId: s
 			userId,
 			occurredAt: now
 		});
-		// Batal cancels the pelunasan, leaving Batal restores it (P3-02 voids unpaid invoices here)
+		// Batal cancels the pelunasan (leaving Batal restores it) and voids invoices with no payment;
+		// a paid DP stays as income
 		await ensureSchedule(tx, current.id);
+		if (to === 'lost') {
+			const voided = await voidUnpaidInvoices(tx, current.id);
+			if (voided.length)
+				await tx.insert(activity).values({
+					clientId: current.clientId,
+					bookingId: current.id,
+					type: 'invoice',
+					body: `Invoice dibatalkan karena booking batal: ${voided.join(', ')}`,
+					meta: { voided },
+					userId,
+					occurredAt: now
+				});
+		}
 		return { from, to, changed: true };
 	});
 }
