@@ -1,21 +1,28 @@
 // Demo CRM data for the Neon `dev` branch (P2-01): clients, bookings across every stage, sessions,
-// add-ons and activity. Refuses to run unless NEON_BRANCH=dev or the database is local.
+// add-ons and activity; since P3-06 also DP / pelunasan payments, direct costs and overhead, so the
+// Dashboard and Laba Rugi have numbers. Refuses to run unless NEON_BRANCH=dev or the database is local.
 // Re-running replaces the previous demo rows (clients tagged with DEMO_TAG in `notes`).
 //   npx tsx scripts/seed-crm.ts
 // Lead sources are not seeded here: migration 0006_crm inserts the dummy list on every branch.
 import { addDays, format } from 'date-fns';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client.ts';
 import {
 	activity,
 	booking,
 	bookingAddon,
+	bookingInstallment,
 	bookingSession,
 	client,
-	leadSource
+	expense,
+	expenseCategory,
+	invoice,
+	leadSource,
+	payment
 } from '../src/lib/server/db/schema/index.ts';
 import { nowWib } from '../src/lib/format.ts';
 import { ensureSchedule } from '../src/lib/server/services/installments.ts';
+import { nextNumber } from '../src/lib/server/services/invoices.ts';
 
 try {
 	process.loadEnvFile();
@@ -220,14 +227,34 @@ try {
 		const old = await tx.select({ id: client.id }).from(client).where(eq(client.notes, DEMO_TAG));
 		if (old.length) {
 			const ids = old.map((c) => c.id);
+			const oldBookings = (
+				await tx.select({ id: booking.id }).from(booking).where(inArray(booking.clientId, ids))
+			).map((b) => b.id);
+			if (oldBookings.length) {
+				// money rows point at bookings with restrict: they go first
+				await tx.delete(payment).where(inArray(payment.bookingId, oldBookings));
+				await tx.delete(invoice).where(inArray(invoice.bookingId, oldBookings));
+				await tx.delete(expense).where(inArray(expense.bookingId, oldBookings));
+			}
 			await tx.delete(booking).where(inArray(booking.clientId, ids));
 			await tx.delete(client).where(inArray(client.id, ids));
 		}
+		await tx.delete(expense).where(like(expense.description, `${DEMO_TAG}%`));
 
 		const sources = new Map(
 			(await tx.select().from(leadSource)).map((s) => [s.name, s.id] as const)
 		);
 		const clientIds = new Map<string, string>();
+		const categories = new Map(
+			(await tx.select().from(expenseCategory)).map((c) => [c.name, c.id] as const)
+		);
+		const category = (name: string) => {
+			const id = categories.get(name) ?? categories.values().next().value;
+			if (!id) fail('no expense categories: run the migrations first');
+			return id as string;
+		};
+		let payments = 0;
+		let expenses = 0;
 		const perStage = new Map<Stage, number>();
 		const now = new Date();
 
@@ -293,6 +320,50 @@ try {
 				);
 			await ensureSchedule(tx, b.id);
 
+			// Money (P3-04 / P3-05): the DP on the day it was paid; the pelunasan once Hari H has
+			// passed and the booking is done; a crew fee as the direct cost
+			if (d.bookedDaysAgo !== undefined) {
+				const [dp, pelunasan] = await tx
+					.select()
+					.from(bookingInstallment)
+					.where(eq(bookingInstallment.bookingId, b.id))
+					.orderBy(bookingInstallment.sort);
+				const paidOn = day(-d.bookedDaysAgo);
+				await tx.insert(payment).values({
+					bookingId: b.id,
+					installmentId: dp.id,
+					receiptNumber: await nextNumber(tx, 'KW', paidOn),
+					paidOn,
+					amount: dp.amount,
+					method: 'transfer',
+					note: DEMO_TAG
+				});
+				payments++;
+				const first = Math.min(...d.sessions.map((s) => s.offset ?? Infinity));
+				if (d.stage === 'completed' && first < 0) {
+					const on = day(first);
+					await tx.insert(payment).values({
+						bookingId: b.id,
+						installmentId: pelunasan.id,
+						receiptNumber: await nextNumber(tx, 'KW', on),
+						paidOn: on,
+						amount: pelunasan.amount,
+						method: 'transfer',
+						note: DEMO_TAG
+					});
+					payments++;
+				}
+				await tx.insert(expense).values({
+					spentOn: day(first < 0 ? first : -1),
+					amount: Math.round((d.price * 0.15) / 1000) * 1000,
+					categoryId: category('Fee crew'),
+					bookingId: b.id,
+					description: `${DEMO_TAG} fee second shooter`,
+					method: 'transfer'
+				});
+				expenses++;
+			}
+
 			await tx.insert(activity).values([
 				{
 					clientId,
@@ -318,8 +389,27 @@ try {
 			]);
 		}
 
+		// Overhead (no booking): this month and the one before
+		const overhead: [string, number, number][] = [
+			['Iklan', 750_000, -3],
+			['Langganan aplikasi', 300_000, -10],
+			['Iklan', 500_000, -35],
+			['Alat / Gear', 1_200_000, -45]
+		];
+		for (const [name, amount, offset] of overhead) {
+			await tx.insert(expense).values({
+				spentOn: day(offset),
+				amount,
+				categoryId: category(name),
+				bookingId: null,
+				description: `${DEMO_TAG} ${name.toLowerCase()}`,
+				method: 'transfer'
+			});
+			expenses++;
+		}
+
 		console.log(
-			`Seeded ${clientIds.size} demo clients and ${DEMOS.length} bookings (replaced ${old.length} old clients)`
+			`Seeded ${clientIds.size} demo clients, ${DEMOS.length} bookings, ${payments} payments and ${expenses} expenses (replaced ${old.length} old clients)`
 		);
 	});
 } catch (e) {
