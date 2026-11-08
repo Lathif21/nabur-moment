@@ -1,6 +1,7 @@
 // P1-03 "Done when": editing a field and pressing Terbitkan changes what the public route reads;
 // preview shows drafts only to logged-in users. Dev branch only; restores the original content.
 import { expect, test, type Page } from '@playwright/test';
+import { getSection } from '../../src/lib/cms/sections.ts';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import {
 	getPageForEdit,
@@ -28,6 +29,10 @@ test.beforeAll(async () => {
 	const db = createDb(process.env.DATABASE_URL!);
 	try {
 		original = (await getPageForEdit(db, 'home')).find((s) => s.key === 'hero')!.draft;
+		// Two suites running at once on the shared dev branch can save another run's test headline
+		// as the "original" and restore it for good; never keep a leftover, use the default.
+		if (/^Uji [a-z0-9]+$/.test(String(original.headline)))
+			original = { ...original, headline: getSection('home', 'hero')!.defaults.headline };
 	} finally {
 		await db.$client.end();
 	}
