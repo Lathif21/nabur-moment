@@ -18,6 +18,11 @@ export default defineConfig({
 			adapter
 		})
 	],
+	ssr: {
+		// sanitize-html (CJS) require()s htmlparser2, which is ESM-only. Node allows that, but
+		// Vercel's patched module loader throws ERR_REQUIRE_ESM, so bundle it into the server build.
+		noExternal: ['sanitize-html', 'htmlparser2']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		// the db project has no specs until P0-02
