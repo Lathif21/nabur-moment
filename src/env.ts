@@ -85,6 +85,10 @@ export const variables = defineEnvVars({
 		description: 'Vercel system variable: host of this deployment (no protocol)',
 		schema: optional
 	},
+	VERCEL_BRANCH_URL: {
+		description: 'Vercel system variable: git branch host of a preview deploy (no protocol)',
+		schema: optional
+	},
 	VERCEL_AUTOMATION_BYPASS_SECRET: {
 		description: 'Vercel system variable: Protection Bypass for Automation secret',
 		schema: optional

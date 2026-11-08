@@ -1,6 +1,7 @@
 // P1-03 "Done when": editing a field and pressing Terbitkan changes what the public route reads;
 // preview shows drafts only to logged-in users. Dev branch only; restores the original content.
 import { expect, test, type Page } from '@playwright/test';
+import { gotoFresh } from './helpers/fresh.ts';
 import { getSection } from '../../src/lib/cms/sections.ts';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import {
@@ -97,7 +98,8 @@ test('edit → draft is private → preview for admins → Terbitkan → public'
 	await expect(
 		page.getByRole('region', { name: /Hero/ }).getByText('Belum diterbitkan')
 	).toHaveCount(0);
-	await visitor.goto('/');
-	await expect(visitor.getByRole('heading', { level: 1 })).toContainText(headline);
+	await gotoFresh(visitor, '/', () =>
+		expect(visitor.getByRole('heading', { level: 1 })).toContainText(headline, { timeout: 3_000 })
+	);
 	await visitor.close();
 });
