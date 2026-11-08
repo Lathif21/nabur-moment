@@ -5,7 +5,7 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 import type { DbOrTx } from '../db/client.ts';
 import { albumItem, media, portfolioAlbum } from '../db/schema/index.ts';
 import { ServiceError } from './errors.ts';
-import { syncUsage } from './media.ts';
+import { isLibraryMedia, syncUsage } from './media.ts';
 
 export type EventTypeKey = (typeof portfolioAlbum.eventType.enumValues)[number];
 
@@ -100,7 +100,7 @@ export async function saveAlbum(
 			const found = await tx
 				.select({ id: media.id })
 				.from(media)
-				.where(and(inArray(media.id, ids), eq(media.status, 'ready')));
+				.where(and(inArray(media.id, ids), eq(media.status, 'ready'), isLibraryMedia));
 			if (found.length !== ids.length) throw new ServiceError('Ada media yang sudah dihapus.');
 		}
 		const cover = input.coverMediaId ?? input.items[0]?.mediaId ?? null;
