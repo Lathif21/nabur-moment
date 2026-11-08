@@ -98,10 +98,14 @@ test.afterAll(async () => {
 });
 
 test('sitemap lists published albums; robots.txt and admin noindex', async ({ request }) => {
-	const sitemap = await request.get('/sitemap.xml');
-	expect(sitemap.headers()['content-type']).toContain('application/xml');
-	const xml = await sitemap.text();
-	expect(xml).toContain(`/portofolio/${slug}</loc>`);
+	// Cached on Vercel: the refreshed sitemap reaches every edge within a few seconds
+	let xml = '';
+	await expect(async () => {
+		const sitemap = await request.get('/sitemap.xml');
+		expect(sitemap.headers()['content-type']).toContain('application/xml');
+		xml = await sitemap.text();
+		expect(xml).toContain(`/portofolio/${slug}</loc>`);
+	}).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] });
 	expect(xml).toContain('/paket</loc>');
 
 	const robots = await (await request.get('/robots.txt')).text();
