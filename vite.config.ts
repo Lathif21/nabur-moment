@@ -6,7 +6,33 @@ import { sveltekit } from '@sveltejs/kit/vite';
 // sin1 = Singapore, next to the Neon database (aws-ap-southeast-1): every query is a round trip.
 const adapter = vercelAdapter({ regions: ['sin1'] });
 
-export default defineConfig({
+// sanitize-html (CJS) require()s htmlparser2, which is ESM-only. Node allows that, but Vercel's
+// patched module loader throws ERR_REQUIRE_ESM. So the production build bundles sanitize-html with
+// its whole dependency tree: a partial bundle leaves `__require('x')` calls that Vercel's file
+// tracing does not follow (Cannot find module). After a build, the only `__require(...)` left in
+// .svelte-kit/output/server/chunks must be Node built-ins.
+// Build only: in `vite dev` the SSR module runner would evaluate the CJS file as ESM
+// (require is not defined); plain Node loads it fine there.
+const BUNDLED_FOR_VERCEL = [
+	'sanitize-html',
+	'htmlparser2',
+	'domelementtype',
+	'domhandler',
+	'domutils',
+	'dom-serializer',
+	'entities',
+	'escape-string-regexp',
+	'is-plain-object',
+	'launder',
+	'dayjs',
+	'parse-srcset',
+	'postcss',
+	'nanoid',
+	'picocolors',
+	'source-map-js'
+];
+
+export default defineConfig(({ command }) => ({
 	plugins: [
 		tailwindcss(),
 		sveltekit({
@@ -18,31 +44,7 @@ export default defineConfig({
 			adapter
 		})
 	],
-	ssr: {
-		// sanitize-html (CJS) require()s htmlparser2, which is ESM-only. Node allows that, but
-		// Vercel's patched module loader throws ERR_REQUIRE_ESM. So bundle sanitize-html with its
-		// whole dependency tree: a partial bundle leaves `__require('x')` calls that Vercel's file
-		// tracing does not follow (Cannot find module). After a build, the only `__require(...)`
-		// left in .svelte-kit/output/server/chunks must be Node built-ins.
-		noExternal: [
-			'sanitize-html',
-			'htmlparser2',
-			'domelementtype',
-			'domhandler',
-			'domutils',
-			'dom-serializer',
-			'entities',
-			'escape-string-regexp',
-			'is-plain-object',
-			'launder',
-			'dayjs',
-			'parse-srcset',
-			'postcss',
-			'nanoid',
-			'picocolors',
-			'source-map-js'
-		]
-	},
+	ssr: command === 'build' ? { noExternal: BUNDLED_FOR_VERCEL } : {},
 	test: {
 		expect: { requireAssertions: true },
 		// the db project has no specs until P0-02
@@ -70,4 +72,4 @@ export default defineConfig({
 			}
 		]
 	}
-});
+}));
