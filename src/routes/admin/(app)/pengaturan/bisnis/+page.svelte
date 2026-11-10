@@ -3,6 +3,7 @@
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import ExpenseCategories from '#lib/components/finance/ExpenseCategories.svelte';
+	import SignatureSettings from '#lib/components/finance/SignatureSettings.svelte';
 	import { phoneDisplay } from '#lib/format.ts';
 	import { toast } from '#lib/toast.ts';
 	import type { PageProps } from './$types';
@@ -26,7 +27,7 @@
 <div class="page-body max-w-3xl">
 	<PageHeader
 		title="Bisnis & Keuangan"
-		description="Profil di invoice dan kwitansi, dan rekening BCA untuk transfer."
+		description="Profil di invoice dan kwitansi, rekening BCA untuk transfer, dan tanda tangan."
 	/>
 
 	{#if !data.bankReady}
@@ -174,6 +175,14 @@
 			</div>
 		{/if}
 	</form>
+
+	{#if data.signature}
+		<SignatureSettings
+			preview={data.signature.preview}
+			name={data.signature.name}
+			title={data.signature.title}
+		/>
+	{/if}
 
 	<ExpenseCategories
 		categories={data.categories}

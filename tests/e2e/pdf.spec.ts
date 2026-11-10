@@ -150,3 +150,58 @@ test('settings save the BCA account; invoice and kwitansi download as PDFs', asy
 	expect(receipt.headers()['content-disposition']).toMatch(/filename="KW-NM-2034-09-\d+\.pdf"/);
 	expect((await receipt.body()).subarray(0, 5).toString()).toBe('%PDF-');
 });
+
+test('owner uploads a signature (ttd); the invoice PDF carries it; then removes it', async ({
+	page
+}) => {
+	test.setTimeout(90_000);
+	await login(page);
+	await page.goto('/admin/pengaturan/bisnis');
+	await page.waitForLoadState('networkidle');
+	const card = page.getByRole('region', { name: 'Tanda tangan' });
+
+	// A "photo" of a signature: dark strokes on light grey paper, drawn in the browser
+	const png = await page.evaluate(() => {
+		const c = document.createElement('canvas');
+		c.width = 600;
+		c.height = 400;
+		const x = c.getContext('2d')!;
+		x.fillStyle = '#f2f2f2';
+		x.fillRect(0, 0, 600, 400);
+		x.strokeStyle = '#111';
+		x.lineWidth = 6;
+		x.beginPath();
+		x.moveTo(120, 260);
+		x.bezierCurveTo(200, 80, 300, 320, 480, 150);
+		x.stroke();
+		return c.toDataURL('image/png').split(',')[1];
+	});
+	const chooser = page.waitForEvent('filechooser');
+	await card.getByRole('button', { name: /tanda tangan$/ }).click();
+	await (
+		await chooser
+	).setFiles({ name: 'ttd.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+	await expect(page.getByText('Tanda tangan disimpan.')).toBeVisible({ timeout: 30_000 });
+	await expect(card.getByRole('img', { name: 'Tanda tangan saat ini' })).toBeVisible();
+
+	await card.getByLabel('Nama di bawah tanda tangan').fill('E2E Penanda');
+	await card.getByLabel('Jabatan').fill('Owner');
+	await card.getByRole('button', { name: 'Simpan nama' }).click();
+	await expect(page.getByText('Penanda tangan disimpan.')).toBeVisible();
+
+	// The invoice PDF now embeds an image (the signature)
+	const pdf = await page.request.get(`/admin/keuangan/invoice/${invoiceId}/pdf`);
+	expect(pdf.status()).toBe(200);
+	expect((await pdf.body()).toString('latin1')).toMatch(/\/Subtype\s*\/Image/);
+
+	// Remove: back to the empty line
+	await card.getByLabel('Nama di bawah tanda tangan').fill('');
+	await card.getByLabel('Jabatan').fill('');
+	await card.getByRole('button', { name: 'Simpan nama' }).click();
+	await expect(page.getByText('Penanda tangan disimpan.').first()).toBeVisible();
+	await card.getByRole('button', { name: 'Hapus' }).click();
+	await expect(page.getByText('Tanda tangan dihapus.')).toBeVisible();
+	await expect(card.getByText('Belum ada tanda tangan')).toBeVisible();
+	const plain = await page.request.get(`/admin/keuangan/invoice/${invoiceId}/pdf`);
+	expect((await plain.body()).toString('latin1')).not.toMatch(/\/Subtype\s*\/Image/);
+});

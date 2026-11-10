@@ -4,7 +4,7 @@ import type { Content, TableCell, TDocumentDefinitions } from 'pdfmake/interface
 import { INSTALLMENT_LABEL, INVOICE_STATUS_LABEL, itemsTotal } from '../../finance.ts';
 import { dateID, phoneDisplay, rupiah } from '../../format.ts';
 import { terbilangRupiah } from '../../terbilang.ts';
-import { bankReady, type AppSettings } from '../services/app-settings.ts';
+import { bankReady, type AppSettings, type PdfSigner } from '../services/app-settings.ts';
 import type { InvoiceDetail } from '../services/invoices.ts';
 import {
 	C,
@@ -14,6 +14,7 @@ import {
 	itemCell,
 	label,
 	render,
+	signatureBlock,
 	tableLayout
 } from './common.ts';
 
@@ -30,7 +31,11 @@ const right = (text: string, extra: { bold?: boolean } = {}): TableCell => ({
 });
 
 /** The document definition (pure, so it can be tested without rendering) */
-export function invoiceDocument(inv: InvoiceDetail, s: AppSettings): TDocumentDefinitions {
+export function invoiceDocument(
+	inv: InvoiceDetail,
+	s: AppSettings,
+	signer?: PdfSigner
+): TDocumentDefinitions {
 	const contract = itemsTotal(inv.items);
 	// Installment invoice: the lines are the contract and the total is the installment billed
 	const installment = !!inv.installmentKind && contract !== inv.total;
@@ -175,7 +180,15 @@ export function invoiceDocument(inv: InvoiceDetail, s: AppSettings): TDocumentDe
 			items,
 			words,
 			bank,
-			inv.notes && { stack: [label('Catatan'), { text: inv.notes }], margin: [0, 16, 0, 0] }
+			inv.notes && { stack: [label('Catatan'), { text: inv.notes }], margin: [0, 16, 0, 0] },
+			{
+				columns: [
+					{ width: '*', text: '' },
+					signatureBlock(s, signer, 'Hormat kami,', dateID(inv.issueDate, 'full'))
+				],
+				margin: [0, 24, 0, 0],
+				unbreakable: true
+			}
 		]),
 		watermark: mark
 			? { text: mark.text, color: mark.color, opacity: 0.08, bold: true, fontSize: 90 }
@@ -183,6 +196,10 @@ export function invoiceDocument(inv: InvoiceDetail, s: AppSettings): TDocumentDe
 	};
 }
 
-export function renderInvoicePdf(inv: InvoiceDetail, s: AppSettings): Promise<Buffer> {
-	return render(invoiceDocument(inv, s));
+export function renderInvoicePdf(
+	inv: InvoiceDetail,
+	s: AppSettings,
+	signer?: PdfSigner
+): Promise<Buffer> {
+	return render(invoiceDocument(inv, s, signer));
 }

@@ -234,3 +234,20 @@ export const expenseCategoryArchiveSchema = z.object({
 	id: z.uuid(),
 	archived: z.enum(['true', 'false']).transform((v) => v === 'true')
 });
+
+const signerText = (max: number) =>
+	z
+		.string()
+		.trim()
+		.max(max)
+		.default('')
+		.transform((v) => v || null);
+
+/** Name and title under the signature (owner only) */
+export const signerSchema = z.object({
+	signerName: signerText(80),
+	signerTitle: signerText(60)
+});
+
+/** Signature upload, step 2: the key of the uploaded PNG */
+export const signatureConfirmSchema = z.object({ key: z.string().max(200) });

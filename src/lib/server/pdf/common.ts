@@ -2,14 +2,14 @@
 // brand colours, the forest header band with the cream wordmark, the contacts footer.
 // Pattern from the Befisien CRM invoice PDF.
 import pdfmake from 'pdfmake';
-import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
+import type { Column, Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import openSans400 from '@fontsource/open-sans/files/open-sans-latin-400-normal.woff?inline';
 import openSans600 from '@fontsource/open-sans/files/open-sans-latin-600-normal.woff?inline';
 import openSans400i from '@fontsource/open-sans/files/open-sans-latin-400-italic.woff?inline';
 import playfair400 from '@fontsource/playfair-display/files/playfair-display-latin-400-normal.woff?inline';
 import playfair600 from '@fontsource/playfair-display/files/playfair-display-latin-600-normal.woff?inline';
 import { phoneDisplay } from '../../format.ts';
-import type { AppSettings } from '../services/app-settings.ts';
+import type { AppSettings, PdfSigner } from '../services/app-settings.ts';
 
 /** Colours from 06-DESIGN-SYSTEM (a PDF cannot read the CSS variables) */
 export const C = {
@@ -184,5 +184,48 @@ export function itemCell(it: { description: string; details?: string[] }): Conte
 			{ text: it.description },
 			{ ul: it.details, fontSize: 8.5, color: C.ink2, margin: [0, 3, 0, 0] }
 		]
+	};
+}
+
+/**
+ * Signature block (170 pt wide, centred): optional date, the heading ("Hormat kami," /
+ * "Penerima,"), the signature image or room to sign by hand, a line, then the signer's name and
+ * title (or only the business name when no signer is set).
+ */
+export function signatureBlock(
+	s: AppSettings,
+	signer: PdfSigner | undefined,
+	heading: string,
+	date?: string
+): Column {
+	const name = signer?.name?.trim();
+	const title = signer?.title?.trim();
+	return {
+		width: 170,
+		stack: compact([
+			date && { text: date, alignment: 'center' },
+			{
+				text: heading,
+				alignment: 'center',
+				color: C.ink2,
+				margin: [0, 2, 0, signer?.image ? 4 : 46]
+			},
+			signer?.image && {
+				image: signer.image,
+				fit: [150, 56],
+				alignment: 'center',
+				margin: [0, 0, 0, 2]
+			},
+			{
+				canvas: [{ type: 'line', x1: 10, y1: 0, x2: 160, y2: 0, lineWidth: 0.5, lineColor: C.line }]
+			},
+			{ text: name || s.businessName, alignment: 'center', bold: true, margin: [0, 4, 0, 0] },
+			name && {
+				text: [title, s.businessName].filter(Boolean).join(' · '),
+				alignment: 'center',
+				color: C.ink2,
+				fontSize: 8.5
+			}
+		])
 	};
 }

@@ -4,9 +4,18 @@ import type { Content, TableCell, TDocumentDefinitions } from 'pdfmake/interface
 import { INSTALLMENT_LABEL, PAYMENT_METHOD_LABEL } from '../../finance.ts';
 import { dateID, rupiah } from '../../format.ts';
 import { terbilangRupiah } from '../../terbilang.ts';
-import type { AppSettings } from '../services/app-settings.ts';
+import type { AppSettings, PdfSigner } from '../services/app-settings.ts';
 import type { ReceiptDetail } from '../services/payments.ts';
-import { C, bandHeader, baseDocument, compact, itemCell, label, render } from './common.ts';
+import {
+	C,
+	bandHeader,
+	baseDocument,
+	compact,
+	itemCell,
+	label,
+	render,
+	signatureBlock
+} from './common.ts';
 
 const row = (name: string, value: Content): TableCell[] => [
 	{ text: name, color: C.ink2, margin: [0, 5, 0, 5] },
@@ -14,7 +23,11 @@ const row = (name: string, value: Content): TableCell[] => [
 ];
 
 /** The document definition (pure, so it can be tested without rendering) */
-export function receiptDocument(p: ReceiptDetail, s: AppSettings): TDocumentDefinitions {
+export function receiptDocument(
+	p: ReceiptDetail,
+	s: AppSettings,
+	signer?: PdfSigner
+): TDocumentDefinitions {
 	const purpose = [
 		p.installmentKind ? INSTALLMENT_LABEL[p.installmentKind] : 'Tagihan tambahan',
 		p.booking.title
@@ -109,19 +122,7 @@ export function receiptDocument(p: ReceiptDetail, s: AppSettings): TDocumentDefi
 				]
 			},
 			{ width: '*', text: '' },
-			{
-				width: 170,
-				stack: [
-					{ text: dateID(p.paidOn, 'full'), alignment: 'center' },
-					{ text: 'Penerima,', alignment: 'center', color: C.ink2, margin: [0, 2, 0, 46] },
-					{
-						canvas: [
-							{ type: 'line', x1: 10, y1: 0, x2: 160, y2: 0, lineWidth: 0.5, lineColor: C.line }
-						]
-					},
-					{ text: s.businessName, alignment: 'center', bold: true, margin: [0, 4, 0, 0] }
-				]
-			}
+			signatureBlock(s, signer, 'Penerima,', dateID(p.paidOn, 'full'))
 		],
 		unbreakable: true
 	};
@@ -137,6 +138,10 @@ export function receiptDocument(p: ReceiptDetail, s: AppSettings): TDocumentDefi
 	};
 }
 
-export function renderReceiptPdf(p: ReceiptDetail, s: AppSettings): Promise<Buffer> {
-	return render(receiptDocument(p, s));
+export function renderReceiptPdf(
+	p: ReceiptDetail,
+	s: AppSettings,
+	signer?: PdfSigner
+): Promise<Buffer> {
+	return render(receiptDocument(p, s, signer));
 }

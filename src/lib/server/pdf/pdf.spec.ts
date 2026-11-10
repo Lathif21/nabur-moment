@@ -19,6 +19,9 @@ const settings: AppSettings = {
 	bankName: 'BCA',
 	bankNumber: '1234567890',
 	bankHolder: 'Nabur Moment',
+	signatureKey: null,
+	signerName: null,
+	signerTitle: null,
 	updatedAt: null
 };
 
@@ -66,6 +69,10 @@ const receipt: ReceiptDetail = {
 	paidSoFar: 5_000_000
 };
 
+/** 1×1 transparent PNG */
+const PNG =
+	'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
 /** Every text string of a pdfmake document, flattened */
 function texts(node: unknown): string[] {
 	if (typeof node === 'string') return [node];
@@ -97,6 +104,18 @@ describe('invoice PDF', () => {
 		expect(invoiceDocument({ ...inv, status: 'draft' }, settings).watermark).toMatchObject({
 			text: 'DRAF'
 		});
+	});
+
+	it('signs with the uploaded signature, name and title; else an empty line and the business', () => {
+		const signed = invoiceDocument(inv, settings, { image: PNG, name: 'Lathif', title: 'Owner' });
+		const all = texts(signed.content).join('\n');
+		expect(all).toContain('Hormat kami,');
+		expect(all).toContain('Lathif');
+		expect(all).toContain('Owner · Nabur Moment');
+		expect(JSON.stringify(signed.content)).toContain(PNG);
+		const plain = invoiceDocument(inv, settings);
+		expect(JSON.stringify(plain.content)).not.toContain('data:image/png');
+		expect(texts(plain.content).join('\n')).toContain('Hormat kami,');
 	});
 
 	it('warns inside the PDF when the bank account is not set', () => {
@@ -131,8 +150,18 @@ describe('kwitansi PDF', () => {
 		expect(all).toMatch(/Sisa Rp\s?5\.000\.000/);
 	});
 
+	it('puts the signature on the kwitansi too', () => {
+		const doc = receiptDocument(receipt, settings, { image: PNG, name: 'Lathif', title: null });
+		expect(JSON.stringify(doc.content)).toContain(PNG);
+		expect(texts(doc.content).join('\n')).toContain('Penerima,');
+	});
+
 	it('renders a PDF file', async () => {
-		const pdf = await renderReceiptPdf(receipt, settings);
+		const pdf = await renderReceiptPdf(receipt, settings, {
+			image: PNG,
+			name: 'Lathif',
+			title: 'Owner'
+		});
 		expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
 		if (process.env.PDF_OUT) writeFileSync(join(process.env.PDF_OUT, 'kwitansi.pdf'), pdf);
 	});

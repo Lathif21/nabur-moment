@@ -4,7 +4,8 @@ import { db } from '#lib/server/db/index.ts';
 import { requirePerm } from '#lib/server/guards.ts';
 import { pdfFileName } from '#lib/server/pdf/common.ts';
 import { renderInvoicePdf } from '#lib/server/pdf/invoice-pdf.ts';
-import { readAppSettings } from '#lib/server/services/app-settings.ts';
+import { pdfSigner, readAppSettings } from '#lib/server/services/app-settings.ts';
+import { storage } from '#lib/server/storage/index.ts';
 import { getInvoice } from '#lib/server/services/invoices.ts';
 import type { RequestHandler } from './$types';
 
@@ -14,7 +15,8 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 	if (!z.uuid().safeParse(params.id).success) error(404, 'Invoice tidak ditemukan.');
 	const [inv, settings] = await Promise.all([getInvoice(db, params.id), readAppSettings(db)]);
 	if (!inv) error(404, 'Invoice tidak ditemukan.');
-	const pdf = await renderInvoicePdf(inv, settings);
+	// Signature (ttd) from Pengaturan; without one the PDF keeps an empty signature line
+	const pdf = await renderInvoicePdf(inv, settings, await pdfSigner(settings, storage));
 	const disposition = url.searchParams.has('view') ? 'inline' : 'attachment';
 	return new Response(new Uint8Array(pdf), {
 		headers: {

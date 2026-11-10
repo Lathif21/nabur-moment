@@ -4,7 +4,8 @@ import { db } from '#lib/server/db/index.ts';
 import { requirePerm } from '#lib/server/guards.ts';
 import { pdfFileName } from '#lib/server/pdf/common.ts';
 import { renderReceiptPdf } from '#lib/server/pdf/receipt-pdf.ts';
-import { readAppSettings } from '#lib/server/services/app-settings.ts';
+import { pdfSigner, readAppSettings } from '#lib/server/services/app-settings.ts';
+import { storage } from '#lib/server/storage/index.ts';
 import { getPaymentForReceipt } from '#lib/server/services/payments.ts';
 import type { RequestHandler } from './$types';
 
@@ -17,7 +18,8 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 		readAppSettings(db)
 	]);
 	if (!p) error(404, 'Pembayaran tidak ditemukan.');
-	const pdf = await renderReceiptPdf(p, settings);
+	// Signature (ttd) from Pengaturan; without one the PDF keeps an empty signature line
+	const pdf = await renderReceiptPdf(p, settings, await pdfSigner(settings, storage));
 	const disposition = url.searchParams.has('view') ? 'inline' : 'attachment';
 	return new Response(new Uint8Array(pdf), {
 		headers: {
