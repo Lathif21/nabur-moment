@@ -103,6 +103,11 @@ test('create bookings, keep order after refresh, refuse Booked without DP, Batal
 	await drawer.getByLabel('Judul').fill(B);
 	await drawer.getByLabel('Tanggal').fill(DAY);
 	await expect(drawer.getByText(/Sudah ada booking di tanggal ini/)).toContainText(A);
+	// A typed add-on price flows into the agreed price (the DP is 50% of it)
+	await drawer.getByLabel('Tambah add-on').selectOption('custom');
+	await drawer.getByLabel('Nama', { exact: true }).fill('Drone');
+	await drawer.getByLabel('Harga satuan').fill('2000000');
+	await expect(drawer.getByLabel('Harga disepakati')).toHaveValue('2.000.000');
 	await drawer.getByRole('button', { name: 'Buat booking' }).click();
 	await expect(page.getByText(`Booking ${B} dibuat.`)).toBeVisible();
 

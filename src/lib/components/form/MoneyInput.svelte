@@ -8,7 +8,7 @@
 		name: string;
 	};
 
-	let { value = $bindable(), name, id, ...rest }: Props = $props();
+	let { value = $bindable(), name, id, oninput: onInputProp, ...rest }: Props = $props();
 
 	const grouping = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 	const show = (v: number | null) => (v === null || v === undefined ? '' : grouping.format(v));
@@ -28,6 +28,9 @@
 		const d = digits(e.currentTarget.value).slice(0, 15);
 		value = d === '' ? null : Number(d);
 		text = show(value);
+		// The caller's handler runs after `value` is updated (e.g. the booking drawer recomputes
+		// package + add-ons into the agreed price, which the DP is 50% of)
+		onInputProp?.(e);
 	}
 </script>
 
