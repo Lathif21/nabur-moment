@@ -77,7 +77,6 @@
 					<div class={['min-w-0 flex-1', !a.visible && 'opacity-60']}>
 						<p class="flex flex-wrap items-center gap-2 font-semibold">
 							{a.title}
-							{#if a.featured}<span class="chip chip--success">Pilihan</span>{/if}
 							{#if !a.visible}<span class="chip">Disembunyikan</span>{/if}
 						</p>
 						<p class="text-small text-ink-2">

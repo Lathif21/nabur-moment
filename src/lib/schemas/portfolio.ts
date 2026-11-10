@@ -33,7 +33,6 @@ export const albumSchema = z.object({
 		.union([z.uuid(), z.literal('')])
 		.optional()
 		.transform((v) => v || null),
-	featured: bool,
 	visible: bool,
 	/** JSON: [{ mediaId, caption }] in order */
 	items: z

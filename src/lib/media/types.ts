@@ -8,15 +8,18 @@ export type MediaItem = {
 	kind: MediaKind;
 	filename: string | null;
 	/**
-	 * Small preview for grids (≈480 px image or the video poster); for embeds the provider's still
-	 * (YouTube only, else null)
+	 * Small preview for grids (≈480 px image or the video poster); for embeds the uploaded cover,
+	 * else the provider's still (YouTube only), else null
 	 */
 	thumb: string | null;
 	/** Images: largest rendition; videos: the MP4; embeds: the provider URL */
 	src: string | null;
 	/** Images only */
 	srcset: string | null;
-	/** Videos: the poster frame; embeds: a low-res still to fall back to when `thumb` fails */
+	/**
+	 * Videos: the poster frame; embeds without an uploaded cover: a low-res still to fall back to
+	 * when `thumb` fails
+	 */
 	poster: string | null;
 	width: number | null;
 	height: number | null;
@@ -27,6 +30,8 @@ export type MediaItem = {
 	focalY: number;
 	embedProvider: 'instagram' | 'tiktok' | 'youtube' | null;
 	embedUrl: string | null;
+	/** Embeds: `thumb` is a picture the owner uploaded (Media → Sampul) */
+	coverUploaded: boolean;
 	/** How many places use it; delete only at 0 */
 	usage: number;
 	createdAt: string;

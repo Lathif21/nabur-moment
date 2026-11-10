@@ -10,8 +10,14 @@ export function toMediaItem(row: Row, storage: Pick<FileStorage, 'publicUrl'>): 
 	const url = (k: string | null) => (k ? storage.publicUrl(k) : null);
 	// Grid preview: the first rendition of at least 480 px, else the largest
 	const thumbVariant = row.variants.find((v) => v.w >= 480) ?? row.variants.at(-1);
-	// Embeds: the provider's still (YouTube only); `poster` holds its low-res fallback
-	const still = row.kind === 'embed' ? embedThumb(row.embedProvider, row.embedUrl) : null;
+	// Embeds: the uploaded cover, else the provider's still (YouTube only, `poster` holds its
+	// low-res fallback)
+	const still =
+		row.kind !== 'embed'
+			? null
+			: row.posterKey
+				? { src: storage.publicUrl(row.posterKey), fallback: null }
+				: embedThumb(row.embedProvider, row.embedUrl);
 	return {
 		id: row.id,
 		kind: row.kind,
@@ -37,6 +43,7 @@ export function toMediaItem(row: Row, storage: Pick<FileStorage, 'publicUrl'>): 
 		focalY: row.focalY,
 		embedProvider: row.embedProvider,
 		embedUrl: row.embedUrl,
+		coverUploaded: row.kind === 'embed' && !!row.posterKey,
 		usage: row.usage,
 		createdAt: row.createdAt.toISOString()
 	};

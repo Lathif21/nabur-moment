@@ -50,7 +50,6 @@ export async function listAlbums(db: DbOrTx) {
 			eventDate: portfolioAlbum.eventDate,
 			city: portfolioAlbum.city,
 			coverMediaId: portfolioAlbum.coverMediaId,
-			featured: portfolioAlbum.featured,
 			visible: portfolioAlbum.visible,
 			position: portfolioAlbum.position,
 			items: db.$count(albumItem, eq(albumItem.albumId, portfolioAlbum.id))
@@ -80,7 +79,6 @@ export type AlbumInput = {
 	city: string;
 	story: string;
 	coverMediaId: string | null;
-	featured: boolean;
 	visible: boolean;
 	/** The album's media in order */
 	items: { mediaId: string; caption: string }[];
@@ -114,7 +112,6 @@ export async function saveAlbum(
 			city: input.city,
 			story: input.story,
 			coverMediaId: cover,
-			featured: input.featured,
 			visible: input.visible
 		};
 
@@ -201,7 +198,6 @@ export async function visibleAlbumsWithItems(db: DbOrTx) {
 		city: a.city,
 		story: a.story,
 		cover: a.coverMediaId,
-		featured: a.featured,
 		items: items
 			.filter((i) => i.albumId === a.id)
 			.map((i) => ({ media: i.media, caption: i.caption }))

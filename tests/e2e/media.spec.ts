@@ -94,6 +94,25 @@ test('upload, edit, pick and delete images, an MP4 and an embed', async ({ page 
 	await drawer.getByRole('button', { name: 'Tutup' }).first().click();
 	await expect(tile(page, `Gambar: Ikon ${run}`)).toBeVisible();
 
+	// 3b. Embed cover: upload through the button, then remove it again
+	await embedTile.click();
+	const chooser = page.waitForEvent('filechooser');
+	await drawer.getByRole('button', { name: 'Unggah sampul' }).click();
+	await (
+		await chooser
+	).setFiles({
+		name: 'sampul.png',
+		mimeType: 'image/png',
+		buffer: readFileSync('static/icon-512.png')
+	});
+	await expect(page.getByText('Sampul disimpan.')).toBeVisible({ timeout: 30_000 });
+	await expect(drawer.getByRole('button', { name: 'Ganti sampul' })).toBeVisible();
+	await expect(drawer.getByText('dipakai sebagai sampul album')).toBeVisible();
+	await drawer.getByRole('button', { name: 'Hapus sampul' }).click();
+	await expect(page.getByText('Sampul dihapus.')).toBeVisible();
+	await expect(drawer.getByRole('button', { name: 'Unggah sampul' })).toBeVisible();
+	await drawer.getByRole('button', { name: 'Tutup' }).first().click();
+
 	// 4. The picker returns ids
 	await page.goto('/admin/dev/komponen');
 	await page.waitForLoadState('networkidle');

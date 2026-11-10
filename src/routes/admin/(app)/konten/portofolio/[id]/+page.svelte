@@ -151,15 +151,6 @@
 				<input
 					type="checkbox"
 					class="checkbox"
-					name="featured"
-					checked={data.album?.featured ?? false}
-				/>
-				Album pilihan (tampil di Beranda)
-			</label>
-			<label class="flex min-h-10 items-center gap-3">
-				<input
-					type="checkbox"
-					class="checkbox"
 					name="visible"
 					checked={data.album ? data.album.visible : true}
 				/>

@@ -181,8 +181,95 @@ export async function createEmbed(db: DbOrTx, input: { url: string }, userId: st
 	return row;
 }
 
+/** Longest side of an embed cover; the browser scales the picture down to it */
+export const EMBED_COVER_MAX = 1600;
+const coverKeyOf = (id: string) => new RegExp(`^media/${id}/cover-[0-9a-f]{8}\\.webp$`);
+
+async function lockEmbed(tx: DbOrTx, id: string) {
+	const [row] = await tx
+		.select({ kind: media.kind, posterKey: media.posterKey })
+		.from(media)
+		.where(eq(media.id, id))
+		.for('update');
+	if (!row || row.kind !== 'embed') throw new ServiceError('Embed tidak ditemukan.');
+	return row;
+}
+
 /**
- * Library items: files in the public site bucket, and embeds (no bucket). Other rows, such as
+ * Embed cover, step 1: a presigned PUT for one WebP. Instagram and TikTok give no thumbnail, so
+ * the owner uploads one. Each upload gets a new key, so a replaced cover never shows from cache.
+ */
+export async function createEmbedCoverUpload(
+	db: DbOrTx,
+	storage: FileStorage,
+	id: string
+): Promise<UploadTarget> {
+	await lockEmbed(db, id);
+	const key = `${folder(id)}/cover-${randomUUID().slice(0, 8)}.webp`;
+	return { key, ...(await storage.uploadUrl(SITE_BUCKET, key, IMAGE_MIME)) };
+}
+
+/**
+ * Embed cover, step 2: the file is in the bucket, so the embed points at it (`poster_key`, the
+ * site bucket so deleting the embed removes it too). The previous cover's file is removed.
+ */
+export async function setEmbedCover(
+	db: DbOrTx,
+	storage: FileStorage,
+	id: string,
+	input: { key: string; width: number; height: number }
+) {
+	if (!coverKeyOf(id).test(input.key)) throw new ServiceError('Sampul tidak valid.');
+	for (const v of [input.width, input.height])
+		if (!Number.isInteger(v) || v < 1 || v > EMBED_COVER_MAX)
+			throw new ServiceError('Ukuran sampul tidak valid.');
+	if ((await storage.size(SITE_BUCKET, input.key)) === null)
+		throw new ServiceError('Unggahan belum lengkap. Coba unggah ulang.');
+	const { old, row } = await db.transaction(async (tx) => {
+		const found = await lockEmbed(tx, id);
+		const [row] = await tx
+			.update(media)
+			.set({
+				bucket: SITE_BUCKET,
+				posterKey: input.key,
+				width: input.width,
+				height: input.height
+			})
+			.where(eq(media.id, id))
+			.returning();
+		return { old: found.posterKey, row };
+	});
+	if (old && old !== input.key) await removeQuietly(storage, [old]);
+	return row;
+}
+
+/** Back to no cover (YouTube falls back to its own thumbnail) */
+export async function removeEmbedCover(db: DbOrTx, storage: FileStorage, id: string) {
+	const { old, row } = await db.transaction(async (tx) => {
+		const found = await lockEmbed(tx, id);
+		const [row] = await tx
+			.update(media)
+			.set({ bucket: null, posterKey: null, width: null, height: null })
+			.where(eq(media.id, id))
+			.returning();
+		return { old: found.posterKey, row };
+	});
+	if (old) await removeQuietly(storage, [old]);
+	return row;
+}
+
+/** The row already moved on; a file that fails to delete is only an orphan */
+async function removeQuietly(storage: FileStorage, keys: string[]) {
+	try {
+		await storage.remove(SITE_BUCKET, keys);
+	} catch (e) {
+		console.warn(`media: could not remove ${keys.join(', ')}: ${String(e)}`);
+	}
+}
+
+/**
+ * Library items: files in the public site bucket, and embeds (no bucket, or the site bucket once
+ * they have an uploaded cover). Other rows, such as
  * payment proofs in the private bucket (services/payment-proofs.ts), never show in the library or
  * the pickers, cannot go on a page, and cannot be edited or deleted from here.
  */

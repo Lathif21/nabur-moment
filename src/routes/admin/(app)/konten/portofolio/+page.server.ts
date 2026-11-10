@@ -22,7 +22,7 @@ import { deleteAlbum, listAlbums } from '#lib/server/services/portfolio.ts';
 import { storage } from '#lib/server/storage/index.ts';
 import type { Actions, PageServerLoad } from './$types';
 
-// Konten → Portofolio (03-SCREENS B7): album list (order, featured, show / hide) + Terbitkan
+// Konten → Portofolio (03-SCREENS B7): album list (order, show / hide) + Terbitkan
 export const load: PageServerLoad = async ({ locals }) => {
 	requirePerm(locals, 'cms_portfolio', 'read');
 	const [albums, status] = await Promise.all([listAlbums(db), listStatus(db, 'portfolio')]);

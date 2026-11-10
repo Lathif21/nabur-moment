@@ -3,8 +3,10 @@
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import ImageIcon from '@lucide/svelte/icons/image';
+	import ImageUp from '@lucide/svelte/icons/image-up';
 	import Link2 from '@lucide/svelte/icons/link-2';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import X from '@lucide/svelte/icons/x';
 	import ConfirmDialog from '#lib/components/admin/ConfirmDialog.svelte';
 	import Drawer from '#lib/components/admin/Drawer.svelte';
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
@@ -14,7 +16,9 @@
 	import FocalPicker from '#lib/components/media/FocalPicker.svelte';
 	import MediaGrid from '#lib/components/media/MediaGrid.svelte';
 	import MediaUploader from '#lib/components/media/MediaUploader.svelte';
+	import CoverImage from '#lib/components/site/CoverImage.svelte';
 	import { refreshThenToast } from '#lib/enhance.ts';
+	import { embedAspect } from '#lib/media/embed.ts';
 	import {
 		duration,
 		fileSize,
@@ -22,6 +26,7 @@
 		PROVIDER_LABELS,
 		type MediaItem
 	} from '#lib/media/types.ts';
+	import { uploadEmbedCover } from '#lib/media/upload.ts';
 	import { toast } from '#lib/toast.ts';
 	import type { PageProps } from './$types';
 
@@ -56,6 +61,43 @@
 		detailOpen = true;
 		const res = await fetch(resolve('/admin/api/media/[id]', { id: m.id }));
 		if (res.ok && currentId === m.id) usage = await res.json();
+	}
+
+	// Embed cover (Instagram / TikTok give no picture): straight to the bucket, then reload
+	let coverInput = $state<HTMLInputElement>();
+	let coverBusy = $state(false);
+	const coverBase = (id: string) => resolve('/admin/api/media/[id]/cover', { id });
+
+	async function pickCover(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file || !current) return;
+		coverBusy = true;
+		try {
+			await uploadEmbedCover(file, coverBase(current.id));
+			await invalidateAll();
+			toast.success('Sampul disimpan.');
+		} catch (err) {
+			toast.error((err as Error).message);
+		} finally {
+			coverBusy = false;
+		}
+	}
+
+	async function removeCover() {
+		if (!current) return;
+		coverBusy = true;
+		try {
+			const res = await fetch(coverBase(current.id), { method: 'DELETE' });
+			if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'Gagal.');
+			await invalidateAll();
+			toast.success('Sampul dihapus.');
+		} catch (err) {
+			toast.error((err as Error).message);
+		} finally {
+			coverBusy = false;
+		}
 	}
 
 	const USAGE_LABELS: Record<string, string> = {
@@ -165,6 +207,64 @@
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 				<input type="hidden" name="focalX" value={current.focalX} />
 				<input type="hidden" name="focalY" value={current.focalY} />
+
+				<section aria-labelledby="embed-cover-title" class="flex flex-col gap-2">
+					<h3 id="embed-cover-title" class="text-small font-semibold">Sampul</h3>
+					{#if current.thumb}
+						<div
+							class="w-40 overflow-hidden rounded-card bg-sage-20"
+							style:aspect-ratio={embedAspect(current.embedProvider)}
+						>
+							<CoverImage media={current} sizes="10rem" class="h-full w-full object-cover" />
+						</div>
+					{/if}
+					<p class="text-small text-ink-2">
+						{#if current.coverUploaded}
+							Gambar ini dipakai sebagai sampul album dan di balik tombol putar.
+						{:else if current.thumb}
+							Memakai thumbnail dari YouTube. Unggah gambar untuk menggantinya.
+						{:else}
+							{PROVIDER_LABELS[current.embedProvider!]} tidak memberi gambar. Unggah satu agar embed ini
+							bisa jadi sampul album.
+						{/if}
+					</p>
+					{#if data.can.update}
+						<input
+							bind:this={coverInput}
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/heic,image/avif"
+							class="sr-only"
+							tabindex="-1"
+							aria-hidden="true"
+							onchange={pickCover}
+						/>
+						<div class="flex flex-wrap gap-2">
+							<button
+								type="button"
+								class="btn btn--secondary btn--sm"
+								disabled={coverBusy}
+								onclick={() => coverInput?.click()}
+							>
+								<ImageUp size={16} aria-hidden="true" />
+								{coverBusy
+									? 'Mengunggah…'
+									: current.coverUploaded
+										? 'Ganti sampul'
+										: 'Unggah sampul'}
+							</button>
+							{#if current.coverUploaded}
+								<button
+									type="button"
+									class="btn btn--ghost btn--sm text-danger"
+									disabled={coverBusy}
+									onclick={removeCover}
+								>
+									<X size={16} aria-hidden="true" /> Hapus sampul
+								</button>
+							{/if}
+						</div>
+					{/if}
+				</section>
 			{/if}
 
 			{#if current.kind !== 'embed'}

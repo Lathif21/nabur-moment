@@ -18,7 +18,10 @@ export const portfolioAlbum = pgTable('portfolio_album', {
 	city: text('city').default('').notNull(),
 	story: text('story').default('').notNull(),
 	coverMediaId: uuid('cover_media_id').references(() => media.id, { onDelete: 'set null' }),
-	/** Shown on Beranda (featured section) */
+	/**
+	 * Unused since 10 Nov 2026: Beranda shows every published album, so the "Pilihan" checkbox was
+	 * removed. Kept until a later migration drops it.
+	 */
 	featured: boolean('featured').default(false).notNull(),
 	/** Hide without deleting; takes effect on Terbitkan */
 	visible: boolean('visible').default(true).notNull(),

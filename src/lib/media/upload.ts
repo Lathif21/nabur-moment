@@ -137,6 +137,40 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 	return res.json();
 }
 
+/** Longest side of an embed cover (services/media.ts EMBED_COVER_MAX) */
+export const EMBED_COVER_MAX = 1600;
+
+/**
+ * Uploads a cover picture for an embed (Instagram / TikTok give none) and returns the updated
+ * item. The picture becomes one WebP of at most 1600 px. `base` is the resolved
+ * `admin/api/media/[id]/cover` path.
+ */
+export async function uploadEmbedCover(file: File, base: string): Promise<MediaItem> {
+	if (!file.type.startsWith('image/')) throw new Error(`${file.name}: pilih file gambar.`);
+	let bitmap: ImageBitmap;
+	try {
+		bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+	} catch {
+		throw new Error(`${file.name}: format gambar tidak bisa dibaca peramban ini.`);
+	}
+	const scale = Math.min(1, EMBED_COVER_MAX / Math.max(bitmap.width, bitmap.height));
+	const width = Math.max(1, Math.round(bitmap.width * scale));
+	const height = Math.max(1, Math.round(bitmap.height * scale));
+	const blob = await toWebp(bitmap, width, height);
+	bitmap.close();
+
+	const target = await api<Target>(base, { method: 'POST' });
+	try {
+		await put(target, blob, () => {});
+	} catch {
+		await put(target, blob, () => {});
+	}
+	return api<MediaItem>(base, {
+		method: 'PUT',
+		body: JSON.stringify({ key: target.key, width, height })
+	});
+}
+
 /**
  * Uploads one file to the library and returns the ready item. Each PUT is retried once.
  * `base` is the resolved `admin/api/media` path.

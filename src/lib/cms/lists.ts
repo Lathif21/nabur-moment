@@ -48,7 +48,6 @@ export type PublishedAlbum = {
 	story: string;
 	/** Media id */
 	cover: string | null;
-	featured: boolean;
 	items: { media: string; caption: string }[];
 };
 

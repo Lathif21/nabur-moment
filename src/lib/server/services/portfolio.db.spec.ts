@@ -56,7 +56,6 @@ const base: Omit<AlbumInput, 'title' | 'items'> = {
 	city: 'Bandung',
 	story: '',
 	coverMediaId: null,
-	featured: false,
 	visible: true
 };
 

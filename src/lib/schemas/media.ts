@@ -24,6 +24,13 @@ export const uploadSchema = z.discriminatedUnion('kind', [
 	})
 ]);
 
+/** Embed cover, step 2: the uploaded WebP's key and size */
+export const embedCoverSchema = z.object({
+	key: z.string().max(200),
+	width: z.int().positive().max(10000),
+	height: z.int().positive().max(10000)
+});
+
 export const embedSchema = z.object({
 	url: z.string().trim().min(1, 'Tempel tautan Instagram, TikTok, atau YouTube.')
 });

@@ -20,6 +20,7 @@ function item(id: string, patch: Partial<MediaItem>): MediaItem {
 		focalY: 0.5,
 		embedProvider: null,
 		embedUrl: null,
+		coverUploaded: false,
 		usage: 0,
 		createdAt: '2026-11-10T00:00:00.000Z',
 		...patch

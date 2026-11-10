@@ -59,7 +59,6 @@ test.beforeAll(async () => {
 			city: '',
 			story: 'Album untuk tes SEO.',
 			coverMediaId: null,
-			featured: false,
 			visible: true,
 			items: []
 		});

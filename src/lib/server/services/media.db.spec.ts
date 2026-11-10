@@ -6,13 +6,17 @@ import { createDb } from '../db/client';
 import { media, mediaUsage } from '../db/schema/index';
 import { neonStorage, PRIVATE_BUCKET, SITE_BUCKET, storageConfig } from '../storage/files';
 import { ServiceError } from './errors';
+import { toMediaItem } from '../media-view';
 import {
 	confirmUpload,
 	createEmbed,
+	createEmbedCoverUpload,
 	createUpload,
 	deleteMedia,
 	listMedia,
 	mediaByIds,
+	removeEmbedCover,
+	setEmbedCover,
 	syncUsage,
 	updateMedia
 } from './media';
@@ -122,6 +126,61 @@ describe.runIf(ready)('media library on the dev bucket', () => {
 			embedUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
 			status: 'ready'
 		});
+	});
+
+	it('sets, replaces and removes an embed cover; deleting the embed removes its file', async () => {
+		const row = await createEmbed(db, { url: 'https://www.instagram.com/reel/SpecCover1/' }, null);
+		made.push(row.id);
+		const view = async () => toMediaItem((await mediaByIds(db, [row.id]))[0], storage);
+		expect((await view()).thumb).toBeNull();
+
+		const upload = async () => {
+			const t = await createEmbedCoverUpload(db, storage, row.id);
+			expect(t.key).toMatch(new RegExp(`^media/${row.id}/cover-[0-9a-f]{8}\\.webp$`));
+			// Not confirmable before the file is there
+			await expect(
+				setEmbedCover(db, storage, row.id, { key: t.key, width: 900, height: 1600 })
+			).rejects.toBeInstanceOf(ServiceError);
+			const res = await fetch(t.url, { method: 'PUT', body: WEBP, headers: t.headers });
+			expect(res.status).toBe(200);
+			await setEmbedCover(db, storage, row.id, { key: t.key, width: 900, height: 1600 });
+			return t.key;
+		};
+
+		const first = await upload();
+		let item = await view();
+		expect(item).toMatchObject({ coverUploaded: true, poster: null, width: 900, height: 1600 });
+		expect(item.thumb).toBe(storage.publicUrl(first));
+		// Still an embed in the library
+		expect((await listMedia(db, { kind: 'embed', limit: 200 })).some((m) => m.id === row.id)).toBe(
+			true
+		);
+
+		// Replacing: new key, the old file is gone
+		const second = await upload();
+		expect(second).not.toBe(first);
+		expect(await storage.size(SITE_BUCKET, first)).toBeNull();
+
+		// Keys outside this embed's folder, odd sizes and non-embeds are refused
+		const other = await createEmbed(db, { url: 'https://youtu.be/SpecOther01' }, null);
+		made.push(other.id);
+		await expect(
+			setEmbedCover(db, storage, other.id, { key: second, width: 900, height: 1600 })
+		).rejects.toBeInstanceOf(ServiceError);
+		await expect(
+			setEmbedCover(db, storage, row.id, { key: second, width: 9000, height: 1600 })
+		).rejects.toBeInstanceOf(ServiceError);
+
+		// Remove → no cover, file gone
+		await removeEmbedCover(db, storage, row.id);
+		item = await view();
+		expect(item).toMatchObject({ coverUploaded: false, thumb: null, width: null });
+		expect(await storage.size(SITE_BUCKET, second)).toBeNull();
+
+		// Delete with a cover → the file goes too
+		const third = await upload();
+		await deleteMedia(db, storage, row.id);
+		expect(await storage.size(SITE_BUCKET, third)).toBeNull();
 	});
 
 	it('keeps private-bucket rows (payment proofs) out of the library', async () => {
