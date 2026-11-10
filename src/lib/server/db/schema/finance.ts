@@ -186,6 +186,14 @@ export const appSettings = pgTable(
 		bankName: text('bank_name').default('BCA').notNull(),
 		bankNumber: text('bank_number'),
 		bankHolder: text('bank_holder'),
+		/**
+		 * Signature (ttd) on invoices and kwitansi: a transparent PNG in the private bucket, set and
+		 * replaced by the owner only. Null = the PDFs keep an empty signature line.
+		 */
+		signatureKey: text('signature_key'),
+		/** Printed under the signature, e.g. "Lathif" + "Owner" */
+		signerName: text('signer_name'),
+		signerTitle: text('signer_title'),
 		updatedAt: updatedAt(),
 		updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 	},
