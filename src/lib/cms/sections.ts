@@ -483,11 +483,18 @@ const BASE_PAGES: PageDef[] = [
 				alwaysVisible: true,
 				fields: [
 					{ kind: 'text', key: 'chooseLabel', label: 'Tombol di kartu paket', max: 30 },
+					{
+						kind: 'text',
+						key: 'promoLabel',
+						label: 'Teks lencana promo (di atas persen hemat)',
+						max: 10
+					},
 					{ kind: 'text', key: 'addonsHeading', label: 'Judul add-on', max: 60 },
 					{ kind: 'text', key: 'emptyText', label: 'Teks bila belum ada paket', max: 120 }
 				],
 				defaults: {
 					chooseLabel: 'Pilih paket',
+					promoLabel: 'Hemat',
 					addonsHeading: 'Add-on',
 					emptyText: 'Paket akan segera tersedia.'
 				}

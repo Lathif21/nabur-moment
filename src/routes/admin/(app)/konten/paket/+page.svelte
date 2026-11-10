@@ -329,6 +329,7 @@
 					<div class="flex items-center gap-3">
 						<div class="min-w-0 flex-1">
 							<p class="font-semibold">{c.name}</p>
+							{#if c.subtitle}<p class="text-small text-ink-2">{c.subtitle}</p>{/if}
 							<p class="text-small text-ink-2">{c.packages} paket</p>
 						</div>
 						{@render rowActions(
@@ -523,6 +524,16 @@
 			<Field label="Nama kategori" name="name" required errors={err('name')}>
 				{#snippet children(attrs)}
 					<input {...attrs} class="input" maxlength="60" defaultValue={catEdit?.name ?? ''} />
+				{/snippet}
+			</Field>
+			<Field
+				label="Subjudul (opsional)"
+				name="subtitle"
+				hint="Satu kalimat di bawah judul kategori di halaman Paket."
+				errors={err('subtitle')}
+			>
+				{#snippet children(attrs)}
+					<input {...attrs} class="input" maxlength="160" defaultValue={catEdit?.subtitle ?? ''} />
 				{/snippet}
 			</Field>
 		{/key}

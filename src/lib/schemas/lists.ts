@@ -19,7 +19,8 @@ const optionalId = z
 
 export const categorySchema = z.object({
 	id: optionalId,
-	name: z.string().trim().min(1, 'Nama kategori wajib diisi.').max(60)
+	name: z.string().trim().min(1, 'Nama kategori wajib diisi.').max(60),
+	subtitle: z.string().trim().max(160).default('')
 });
 
 export const packageSchema = z

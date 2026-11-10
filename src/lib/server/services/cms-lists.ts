@@ -160,6 +160,7 @@ export function listCategories(db: DbOrTx) {
 		.select({
 			id: packageCategory.id,
 			name: packageCategory.name,
+			subtitle: packageCategory.subtitle,
 			position: packageCategory.position,
 			packages: db.$count(pkg, eq(pkg.categoryId, packageCategory.id))
 		})
@@ -167,11 +168,14 @@ export function listCategories(db: DbOrTx) {
 		.orderBy(asc(packageCategory.position));
 }
 
-export async function saveCategory(db: DbOrTx, input: { id: string | null; name: string }) {
+export async function saveCategory(
+	db: DbOrTx,
+	input: { id: string | null; name: string; subtitle: string }
+) {
 	if (input.id) {
 		const done = await db
 			.update(packageCategory)
-			.set({ name: input.name })
+			.set({ name: input.name, subtitle: input.subtitle })
 			.where(eq(packageCategory.id, input.id))
 			.returning();
 		if (!done.length) throw new ServiceError('Kategori tidak ditemukan.');
@@ -179,7 +183,11 @@ export async function saveCategory(db: DbOrTx, input: { id: string | null; name:
 	}
 	const [row] = await db
 		.insert(packageCategory)
-		.values({ name: input.name, position: await nextPosition(db, packageCategory) })
+		.values({
+			name: input.name,
+			subtitle: input.subtitle,
+			position: await nextPosition(db, packageCategory)
+		})
 		.returning();
 	return row;
 }
@@ -345,6 +353,8 @@ export async function snapshot<K extends ListKey>(db: DbOrTx, list: K): Promise<
 			.map((c) => ({
 				id: c.id,
 				name: c.name,
+				// Only when set, so lists published before the field existed stay unchanged
+				...(c.subtitle ? { subtitle: c.subtitle } : {}),
 				packages: packages
 					.filter((p) => p.categoryId === c.id && p.visible)
 					.map((p) => ({

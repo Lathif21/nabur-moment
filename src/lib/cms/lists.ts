@@ -30,7 +30,13 @@ export type PackageCard = {
 
 export type PackagesSnapshot = {
 	/** Only categories with at least one visible package */
-	categories: { id: string; name: string; packages: PackageCard[] }[];
+	categories: {
+		id: string;
+		name: string;
+		/** Line under the heading; only present when set */
+		subtitle?: string;
+		packages: PackageCard[];
+	}[];
 	/** Add-ons that are active and shown on the site */
 	addons: { id: string; name: string; price: number; description: string }[];
 };
@@ -75,6 +81,16 @@ export const LIST_PATHS: Record<ListKey, string[]> = {
 	testimonials: [''],
 	faq: ['faq']
 };
+
+/**
+ * Whole percent saved against "Harga normal", rounded down so the badge never overstates
+ * (Rp 450.000 vs Rp 550.000 → 18). 0 when there is no promo.
+ */
+export function discountPercent(price: number, normalPrice: number | null | undefined): number {
+	if (!normalPrice || normalPrice <= price) return 0;
+	// Multiply first: integer maths avoids 0.2 * 100 = 19.999… style floor errors
+	return Math.floor(((normalPrice - price) * 100) / normalPrice);
+}
 
 /** "Paragraf satu\n\nParagraf dua" → paragraphs */
 export function paragraphs(text: string): string[] {

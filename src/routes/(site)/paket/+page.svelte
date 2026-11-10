@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import PromoBadge from '#lib/components/site/PromoBadge.svelte';
 	import PageHero from '#lib/components/site/sections/PageHero.svelte';
+	import { discountPercent } from '#lib/cms/lists.ts';
 	import { rupiah } from '#lib/format.ts';
 	import type { MediaItem } from '#lib/media/types.ts';
 	import type { PageProps } from './$types';
@@ -11,6 +13,7 @@
 	const intro = $derived(data.sections.intro);
 	const list = $derived(data.sections.list.data);
 	const notes = $derived(data.sections.notes);
+	const promoLabel = $derived(String(list.promoLabel ?? ''));
 	const m = (id: unknown): MediaItem | undefined =>
 		typeof id === 'string' ? data.media[id] : undefined;
 </script>
@@ -41,13 +44,17 @@
 
 		{#each data.packages.categories as cat (cat.id)}
 			<section aria-labelledby="cat-{cat.id}" class="flex flex-col gap-6">
-				<h2 id="cat-{cat.id}" class="font-display text-h2">{cat.name}</h2>
+				<header class="flex flex-col gap-2">
+					<h2 id="cat-{cat.id}" class="font-display text-h2">{cat.name}</h2>
+					{#if cat.subtitle}<p class="max-w-[60ch] text-lead text-ink-2">{cat.subtitle}</p>{/if}
+				</header>
 				<ul class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
 					{#each cat.packages as p (p.id)}
 						{@const img = p.image ? data.media[p.image] : undefined}
+						{@const off = discountPercent(p.price, p.normalPrice)}
 						<li
 							class={[
-								'flex flex-col gap-4 border p-6',
+								'relative flex flex-col gap-4 border p-6',
 								p.featured ? 'border-forest bg-forest text-cream' : 'border-sage bg-surface'
 							]}
 						>
@@ -62,16 +69,24 @@
 									loading="lazy"
 								/>
 							{/if}
-							<h3 class="font-display text-[1.5rem]">{p.name}</h3>
+							<h3 class={['font-display text-[1.5rem]', off && !img?.src && 'pr-24']}>{p.name}</h3>
 							{#if p.normalPrice}
-								<p class="flex flex-wrap items-baseline gap-x-3 lining-nums tabular-nums">
-									<span class="font-display text-[1.75rem]"
+								<p
+									class={[
+										'flex flex-wrap items-baseline gap-x-3 lining-nums tabular-nums',
+										off && !img?.src && 'pr-24'
+									]}
+								>
+									<span class="font-display text-[1.75rem] whitespace-nowrap"
 										><span class="sr-only">Harga promo </span>{rupiah(p.price)}</span
 									>
-									<s class="text-lead opacity-70"
+									<s class="text-lead whitespace-nowrap opacity-70"
 										><span class="sr-only">Harga normal </span>{rupiah(p.normalPrice)}</s
 									>
 								</p>
+								{#if off > 0}
+									<PromoBadge percent={off} label={promoLabel} inverse={p.featured} />
+								{/if}
 							{:else}
 								<p class="font-display text-[1.75rem] lining-nums tabular-nums">
 									{rupiah(p.price)}

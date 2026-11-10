@@ -99,6 +99,13 @@
       "when": 1794314215854,
       "tag": "0013_package_normal_price",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794317077294,
+      "tag": "0014_package_category_subtitle",
+      "breakpoints": true
     }
   ]
 }

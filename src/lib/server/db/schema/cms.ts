@@ -60,6 +60,8 @@ const mediaRef = (name: string) => uuid(name).references(() => media.id, { onDel
 export const packageCategory = pgTable('package_category', {
 	id: uuid('id').primaryKey().defaultRandom(),
 	name: text('name').notNull(),
+	/** Line under the category heading on /paket; '' = none */
+	subtitle: text('subtitle').default('').notNull(),
 	position: text('position').notNull(),
 	createdAt: createdAt()
 });

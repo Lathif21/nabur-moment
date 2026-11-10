@@ -1,0 +1,1 @@
+ALTER TABLE "package_category" ADD COLUMN "subtitle" text DEFAULT '' NOT NULL;

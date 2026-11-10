@@ -78,7 +78,7 @@ describe.runIf(isDevDb)('CMS lists', () => {
 
 	it('packages: hidden packages, inactive add-ons and empty categories stay off the site', () =>
 		inRollback(async (tx) => {
-			const cat = await saveCategory(tx, { id: null, name: 'Uji' });
+			const cat = await saveCategory(tx, { id: null, name: 'Uji', subtitle: '1 kru konten' });
 			const base = {
 				id: null,
 				categoryId: cat.id,
@@ -127,6 +127,7 @@ describe.runIf(isDevDb)('CMS lists', () => {
 			const live = await readList(tx, 'packages');
 			const mine = live.categories.find((c) => c.id === cat.id)!;
 			expect(mine.packages.map((p) => p.name)).toEqual(['Silver', 'Gold Promo']);
+			expect(mine.subtitle).toBe('1 kru konten');
 			expect(mine.packages[0]).toMatchObject({ price: 5_000_000, inclusions: ['Video 1 menit'] });
 			// No promo: the key is left out, so older published snapshots stay "not dirty"
 			expect(mine.packages[0]).not.toHaveProperty('normalPrice');
@@ -136,7 +137,7 @@ describe.runIf(isDevDb)('CMS lists', () => {
 			expect(live.categories.every((c) => c.packages.length > 0)).toBe(true);
 
 			await expect(deleteCategory(tx, cat.id)).rejects.toBeInstanceOf(ServiceError);
-			const empty = await saveCategory(tx, { id: null, name: 'Kosong' });
+			const empty = await saveCategory(tx, { id: null, name: 'Kosong', subtitle: '' });
 			await deleteCategory(tx, empty.id);
 			expect(
 				await tx.select().from(packageCategory).where(eq(packageCategory.id, empty.id))
