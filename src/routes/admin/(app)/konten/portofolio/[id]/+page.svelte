@@ -12,6 +12,7 @@
 	import Field from '#lib/components/form/Field.svelte';
 	import MediaPicker from '#lib/components/media/MediaPicker.svelte';
 	import { EVENT_TYPES } from '#lib/crm.ts';
+	import { albumCoverId, pictureOf } from '#lib/media/cover.ts';
 	import { PROVIDER_LABELS, type MediaItem } from '#lib/media/types.ts';
 	import { toast } from '#lib/toast.ts';
 	import type { PageProps } from './$types';
@@ -29,7 +30,10 @@
 	let errors = $state<Record<string, string>>({});
 	let busy = $state(false);
 
-	const coverId = $derived(cover ?? items[0]?.id ?? null);
+	// Same rule as the site (albumCoverId): the chosen cover, else the first item with a picture
+	const coverId = $derived(
+		albumCoverId({ cover, items: items.map((i) => ({ media: i.id })) }, media)
+	);
 	const payload = $derived(
 		JSON.stringify(items.map((i) => ({ mediaId: i.id, caption: i.caption })))
 	);
@@ -225,7 +229,7 @@
 								/>
 							</div>
 							<div class="flex items-center gap-1">
-								{#if m?.kind !== 'embed' && coverId !== item.id}
+								{#if pictureOf(m) && coverId !== item.id}
 									<button
 										type="button"
 										class="icon-btn"

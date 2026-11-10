@@ -4,8 +4,9 @@
 	import { page } from '$app/state';
 	import Menu from '@lucide/svelte/icons/menu';
 	import X from '@lucide/svelte/icons/x';
+	import CmsLink from './CmsLink.svelte';
 	import Logo from './Logo.svelte';
-	import { bookingHref, siteNav } from '#lib/nav.ts';
+	import type { SiteLink } from '#lib/cms/site-settings.ts';
 
 	type Props = {
 		/** Transparent with cream text over a dark hero photo; otherwise cream bar with forest text */
@@ -15,12 +16,19 @@
 		/** Uploaded logos from site settings: light for dark backgrounds, dark for light ones */
 		logoLight: string | null;
 		logoDark: string | null;
+		/** Menu from site settings (only entries with a label and a link) */
+		nav: SiteLink[];
+		/** Header button; hidden when its label or link is empty */
+		button: SiteLink;
 	};
 
-	let { overlay = false, name, logoLight, logoDark }: Props = $props();
+	let { overlay = false, name, logoLight, logoDark, nav, button }: Props = $props();
 	let menuOpen = $state(false);
 
-	const current = (href: string) => page.url.pathname === '/' + href;
+	// Menu links are CMS hrefs ("/tentang"); the trailing slash is optional
+	const current = (href: string) =>
+		href.startsWith('/') && page.url.pathname.replace(/\/$/, '') === href.replace(/\/$/, '');
+	const showButton = $derived(!!(button.label && button.href));
 </script>
 
 <header
@@ -35,19 +43,21 @@
 		</a>
 
 		<nav aria-label="Menu utama" class="hidden items-center gap-8 lg:flex">
-			{#each siteNav as item (item.href)}
-				<a
-					href={resolve(item.href)}
+			{#each nav as item, i (i)}
+				<CmsLink
+					href={item.href}
 					aria-current={current(item.href) ? 'page' : undefined}
 					class="py-2 eyebrow underline-offset-8 hover:underline aria-[current=page]:underline"
-					>{item.label}</a
+					>{item.label}</CmsLink
 				>
 			{/each}
-			<a
-				href={resolve(bookingHref)}
-				class={['site-btn', overlay ? 'site-btn--inverse' : '']}
-				aria-current={current(bookingHref) ? 'page' : undefined}>Booking</a
-			>
+			{#if showButton}
+				<CmsLink
+					href={button.href}
+					class={['site-btn', overlay ? 'site-btn--inverse' : '']}
+					aria-current={current(button.href) ? 'page' : undefined}>{button.label}</CmsLink
+				>
+			{/if}
 		</nav>
 
 		<button
@@ -77,19 +87,21 @@
 				</Dialog.Close>
 			</div>
 			<nav aria-label="Menu utama" class="flex flex-1 flex-col justify-center gap-2 px-8">
-				{#each siteNav as item (item.href)}
-					<a
-						href={resolve(item.href)}
+				{#each nav as item, i (i)}
+					<CmsLink
+						href={item.href}
 						aria-current={current(item.href) ? 'page' : undefined}
 						class="py-2 font-display text-h2 aria-[current=page]:italic"
-						onclick={() => (menuOpen = false)}>{item.label}</a
+						onclick={() => (menuOpen = false)}>{item.label}</CmsLink
 					>
 				{/each}
-				<a
-					href={resolve(bookingHref)}
-					class="site-btn site-btn--inverse mt-8 self-start"
-					onclick={() => (menuOpen = false)}>Booking</a
-				>
+				{#if showButton}
+					<CmsLink
+						href={button.href}
+						class="site-btn site-btn--inverse mt-8 self-start"
+						onclick={() => (menuOpen = false)}>{button.label}</CmsLink
+					>
+				{/if}
 			</nav>
 		</Dialog.Content>
 	</Dialog.Portal>

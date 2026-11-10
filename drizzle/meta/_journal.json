@@ -92,6 +92,13 @@
       "when": 1794147329393,
       "tag": "0012_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794314215854,
+      "tag": "0013_package_normal_price",
+      "breakpoints": true
     }
   ]
 }

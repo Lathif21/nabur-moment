@@ -3,14 +3,14 @@
 	import type { MediaItem } from '#lib/media/types.ts';
 
 	type Member = { photo: MediaItem | undefined; name: string; role: string; bio: string };
-	type Props = { members: Member[] };
+	type Props = { heading: string; members: Member[] };
 
-	let { members }: Props = $props();
+	let { heading, members }: Props = $props();
 </script>
 
 <section class="section-pad" aria-labelledby="team-title">
 	<div class="mx-auto flex max-w-6xl flex-col gap-12 px-5 lg:px-10">
-		<h2 id="team-title" class="text-center font-display text-h2">Tim kami</h2>
+		<h2 id="team-title" class="text-center font-display text-h2">{heading}</h2>
 		<ul class="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
 			{#each members as p, i (i)}
 				<li class="flex flex-col gap-3">

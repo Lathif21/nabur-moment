@@ -211,6 +211,8 @@ export async function savePackage(
 		categoryId: string;
 		name: string;
 		price: number;
+		/** "Harga normal" (struck through on the site); null = no promo */
+		normalPrice: number | null;
 		inclusions: string[];
 		note: string;
 		imageMediaId: string | null;
@@ -219,6 +221,11 @@ export async function savePackage(
 	}
 ) {
 	const { id, ...data } = input;
+	if (data.normalPrice !== null && data.normalPrice <= data.price)
+		throw new ServiceError(
+			'Harga normal harus lebih tinggi dari harga paket, atau kosongkan.',
+			'normalPrice'
+		);
 	return db.transaction(async (tx) => {
 		const [cat] = await tx
 			.select({ id: packageCategory.id })
@@ -344,6 +351,10 @@ export async function snapshot<K extends ListKey>(db: DbOrTx, list: K): Promise<
 						id: p.id,
 						name: p.name,
 						price: p.price,
+						// Only when set, so lists published before the field existed stay unchanged
+						...(p.normalPrice !== null && p.normalPrice > p.price
+							? { normalPrice: p.normalPrice }
+							: {}),
 						inclusions: p.inclusions,
 						note: p.note,
 						image: p.imageMediaId,

@@ -43,6 +43,7 @@
 	let pkgEdit = $state<Pkg | null>(null);
 	let pkgCategory = $state('');
 	let pkgPrice = $state<number | null>(null);
+	let pkgNormalPrice = $state<number | null>(null);
 	let pkgImage = $state<string | null>(null);
 
 	let addonOpen = $state(false);
@@ -59,6 +60,7 @@
 		pkgEdit = p;
 		pkgCategory = p?.categoryId ?? categoryId ?? data.categories[0]?.id ?? '';
 		pkgPrice = p?.price ?? null;
+		pkgNormalPrice = p?.normalPrice ?? null;
 		pkgImage = p?.imageMediaId ?? null;
 		errors = {};
 		pkgOpen = true;
@@ -252,7 +254,9 @@
 											{#if !p.visible}<span class="chip">Disembunyikan</span>{/if}
 										</p>
 										<p class="text-small text-ink-2 tabular-nums">
-											{rupiah(p.price)} · {p.inclusions.length} item
+											{#if p.normalPrice}<s class="mr-1"
+													><span class="sr-only">Harga normal </span>{rupiah(p.normalPrice)}</s
+												>{/if}{rupiah(p.price)} · {p.inclusions.length} item
 										</p>
 									</div>
 									{@render rowActions(
@@ -383,6 +387,18 @@
 			>
 				{#snippet children(attrs)}
 					<MoneyInput {...attrs} bind:value={pkgPrice} />
+				{/snippet}
+			</Field>
+			<Field
+				label="Harga normal (opsional)"
+				name="normalPrice"
+				errors={err('normalPrice')}
+				hint={pkgNormalPrice && pkgPrice && pkgNormalPrice > pkgPrice
+					? `Tampil dicoret: ${rupiah(pkgNormalPrice)}, hemat ${Math.round((1 - pkgPrice / pkgNormalPrice) * 100)}%.`
+					: 'Isi bila sedang promo: harga ini tampil dicoret di samping Harga. Booking tetap memakai Harga.'}
+			>
+				{#snippet children(attrs)}
+					<MoneyInput {...attrs} bind:value={pkgNormalPrice} />
 				{/snippet}
 			</Field>
 			<Field

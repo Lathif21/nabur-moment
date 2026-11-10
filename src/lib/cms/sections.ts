@@ -6,7 +6,13 @@ import { z } from 'zod';
 
 /* ---------- Fields ---------- */
 
-type Base = { key: string; label: string; hint?: string };
+type Base = {
+	key: string;
+	label: string;
+	hint?: string;
+	/** Sub-heading shown in the editor above the first field of a group */
+	group?: string;
+};
 
 export type TextField = Base & { kind: 'text'; max?: number; placeholder?: string };
 export type TextareaField = Base & { kind: 'textarea'; max?: number };
@@ -25,7 +31,7 @@ export type ListField = Base & {
 	kind: 'list';
 	/** Label of one item, e.g. "Anggota tim" */
 	itemLabel: string;
-	fields: (TextField | TextareaField | ImageField)[];
+	fields: (TextField | TextareaField | ImageField | LinkField)[];
 	max?: number;
 };
 
@@ -47,6 +53,10 @@ export type SectionDef = {
 	description?: string;
 	fields: Field[];
 	defaults: Record<string, unknown>;
+	/** Starts hidden when the row is first created (optional sections such as a photo hero) */
+	startHidden?: boolean;
+	/** No Tampilkan switch: the section is part of the page (labels of a list, form, …) */
+	alwaysVisible?: boolean;
 };
 
 export type PageDef = {
@@ -116,8 +126,16 @@ function fieldSchema(f: Field): z.ZodType {
 	}
 }
 
+/**
+ * Fields missing from stored content (added to the registry after the row was saved) take the
+ * section's default, not a blank: a new label keeps its copy on the live site until it is edited.
+ */
 export function sectionSchema(def: SectionDef) {
-	return z.object(Object.fromEntries(def.fields.map((f) => [f.key, fieldSchema(f)])));
+	const shape = z.object(Object.fromEntries(def.fields.map((f) => [f.key, fieldSchema(f)])));
+	return z.preprocess(
+		(v) => (v && typeof v === 'object' && !Array.isArray(v) ? { ...def.defaults, ...v } : v),
+		shape
+	);
 }
 
 /** Every media id a section's content refers to, with the field it sits in */
@@ -146,6 +164,21 @@ const ctaFields: Field[] = [
 	{ kind: 'text', key: 'headline', label: 'Judul', max: 120 },
 	{ kind: 'link', key: 'button', label: 'Tombol' }
 ];
+
+/** Photo band at the top of an inner page; off until the owner turns it on */
+const pageHero = (eyebrow: string, title: string): SectionDef => ({
+	key: 'hero',
+	label: 'Hero foto',
+	description:
+		'Opsional: foto lebar dengan judul di bagian atas halaman. Bila tampil, judul Pembuka menjadi subjudul.',
+	startHidden: true,
+	fields: [
+		{ kind: 'image', key: 'image', label: 'Gambar' },
+		{ kind: 'text', key: 'eyebrow', label: 'Label kecil', max: 60 },
+		{ kind: 'text', key: 'title', label: 'Judul', max: 80 }
+	],
+	defaults: { image: null, eyebrow, title }
+});
 
 const introFields: Field[] = [
 	{ kind: 'text', key: 'eyebrow', label: 'Label kecil', max: 60 },
@@ -180,6 +213,13 @@ const BASE_PAGES: PageDef[] = [
 					{ kind: 'text', key: 'accent', label: 'Judul (miring)', max: 60 },
 					{ kind: 'text', key: 'caption', label: 'Keterangan kecil', max: 80 },
 					{
+						kind: 'link',
+						key: 'button',
+						label: 'Tombol utama',
+						hint: 'Kosongkan teks atau tautan untuk menyembunyikan tombol.'
+					},
+					{ kind: 'link', key: 'button2', label: 'Tombol kedua' },
+					{
 						kind: 'select',
 						key: 'tone',
 						label: 'Warna gambar',
@@ -187,6 +227,24 @@ const BASE_PAGES: PageDef[] = [
 							{ value: 'mono', label: 'Hitam putih' },
 							{ value: 'color', label: 'Berwarna' }
 						]
+					},
+					{
+						kind: 'select',
+						key: 'overlay',
+						label: 'Gelap lapisan di atas gambar',
+						hint: 'Lebih gelap = teks lebih mudah dibaca.',
+						options: [
+							{ value: 'medium', label: 'Sedang' },
+							{ value: 'soft', label: 'Tipis' },
+							{ value: 'strong', label: 'Tebal' }
+						]
+					},
+					{
+						kind: 'text',
+						key: 'scrollLabel',
+						label: 'Teks ajakan gulir',
+						max: 20,
+						hint: 'Di pojok kanan bawah. Kosong = disembunyikan.'
 					}
 				],
 				defaults: {
@@ -195,7 +253,11 @@ const BASE_PAGES: PageDef[] = [
 					headline: 'Momen yang',
 					accent: 'tak terulang',
 					caption: 'Wedding content creator',
-					tone: 'mono'
+					button: { label: '', href: '' },
+					button2: { label: '', href: '' },
+					tone: 'mono',
+					overlay: 'medium',
+					scrollLabel: 'Gulir'
 				}
 			},
 			{
@@ -240,23 +302,23 @@ const BASE_PAGES: PageDef[] = [
 			},
 			{
 				key: 'featured',
-				label: 'Portofolio pilihan',
-				description: 'Album diambil otomatis dari album bertanda "pilihan".',
-				fields: [
-					{ kind: 'text', key: 'heading', label: 'Judul', max: 120 },
-					{ kind: 'number', key: 'count', label: 'Jumlah album', min: 2, max: 6 }
-				],
-				defaults: { heading: 'Cerita terbaru', count: 3 }
+				label: 'Portofolio',
+				description:
+					'Semua album yang sudah diterbitkan tampil di sini, urut seperti di Portofolio.',
+				fields: [{ kind: 'text', key: 'heading', label: 'Judul', max: 120 }],
+				defaults: { heading: 'Cerita terbaru' }
 			},
 			{
 				key: 'packages',
 				label: 'Paket',
 				fields: [
+					{ kind: 'text', key: 'eyebrow', label: 'Label kecil', max: 60 },
 					{ kind: 'text', key: 'heading', label: 'Judul', max: 120 },
 					{ kind: 'textarea', key: 'body', label: 'Paragraf', max: 400 },
 					{ kind: 'link', key: 'button', label: 'Tombol' }
 				],
 				defaults: {
+					eyebrow: 'Paket',
 					heading: 'Paket untuk setiap cerita',
 					body: 'Dari lamaran sampai resepsi, pilih paket yang sesuai atau tambah add-on sesuai kebutuhan.',
 					button: { label: 'Lihat paket', href: '/paket' }
@@ -317,9 +379,10 @@ const BASE_PAGES: PageDef[] = [
 				label: 'Hero',
 				fields: [
 					{ kind: 'image', key: 'image', label: 'Gambar' },
+					{ kind: 'text', key: 'eyebrow', label: 'Label kecil', max: 60 },
 					{ kind: 'text', key: 'title', label: 'Judul', max: 80 }
 				],
-				defaults: { image: null, title: 'Tentang Nabur Moment' }
+				defaults: { image: null, eyebrow: 'Tentang', title: 'Tentang Nabur Moment' }
 			},
 			{
 				key: 'story',
@@ -368,6 +431,7 @@ const BASE_PAGES: PageDef[] = [
 				key: 'team',
 				label: 'Tim',
 				fields: [
+					{ kind: 'text', key: 'heading', label: 'Judul', max: 120 },
 					{
 						kind: 'list',
 						key: 'members',
@@ -382,7 +446,7 @@ const BASE_PAGES: PageDef[] = [
 						]
 					}
 				],
-				defaults: { members: [] }
+				defaults: { heading: 'Tim kami', members: [] }
 			},
 			{
 				key: 'cta',
@@ -401,6 +465,7 @@ const BASE_PAGES: PageDef[] = [
 		label: 'Paket',
 		path: 'paket',
 		sections: [
+			pageHero('Paket', 'Paket & harga'),
 			{
 				key: 'intro',
 				label: 'Pembuka',
@@ -409,6 +474,22 @@ const BASE_PAGES: PageDef[] = [
 					eyebrow: 'Paket',
 					headline: 'Pilih paket untuk harimu',
 					body: '<p>Semua harga sudah termasuk editing. Tambah add-on sesuai kebutuhan.</p>'
+				}
+			},
+			{
+				key: 'list',
+				label: 'Daftar paket',
+				description: 'Paket dan add-on diatur di Konten → Paket. Di sini hanya teks di sekitarnya.',
+				alwaysVisible: true,
+				fields: [
+					{ kind: 'text', key: 'chooseLabel', label: 'Tombol di kartu paket', max: 30 },
+					{ kind: 'text', key: 'addonsHeading', label: 'Judul add-on', max: 60 },
+					{ kind: 'text', key: 'emptyText', label: 'Teks bila belum ada paket', max: 120 }
+				],
+				defaults: {
+					chooseLabel: 'Pilih paket',
+					addonsHeading: 'Add-on',
+					emptyText: 'Paket akan segera tersedia.'
 				}
 			},
 			{
@@ -430,6 +511,7 @@ const BASE_PAGES: PageDef[] = [
 		label: 'FAQ',
 		path: 'faq',
 		sections: [
+			pageHero('FAQ', 'Yang sering ditanyakan'),
 			{
 				key: 'intro',
 				label: 'Pembuka',
@@ -439,6 +521,16 @@ const BASE_PAGES: PageDef[] = [
 					headline: 'Yang sering ditanyakan',
 					body: '<p>Belum menemukan jawabannya? Hubungi kami lewat WhatsApp.</p>'
 				}
+			},
+			{
+				key: 'list',
+				label: 'Daftar pertanyaan',
+				description: 'Pertanyaan diatur di Konten → FAQ.',
+				alwaysVisible: true,
+				fields: [
+					{ kind: 'text', key: 'emptyText', label: 'Teks bila belum ada pertanyaan', max: 120 }
+				],
+				defaults: { emptyText: 'Belum ada pertanyaan.' }
 			},
 			{
 				key: 'cta',
@@ -457,6 +549,7 @@ const BASE_PAGES: PageDef[] = [
 		label: 'Portofolio',
 		path: 'portofolio',
 		sections: [
+			pageHero('Portofolio', 'Cerita yang sudah kami rekam'),
 			{
 				key: 'intro',
 				label: 'Pembuka',
@@ -466,6 +559,39 @@ const BASE_PAGES: PageDef[] = [
 					headline: 'Cerita yang sudah kami rekam',
 					body: '<p>Lihat beberapa momen favorit kami.</p>'
 				}
+			},
+			{
+				key: 'list',
+				label: 'Daftar album',
+				description: 'Album diatur di Konten → Portofolio.',
+				alwaysVisible: true,
+				fields: [
+					{ kind: 'text', key: 'allLabel', label: 'Saringan "semua"', max: 30 },
+					{ kind: 'text', key: 'emptyText', label: 'Teks bila belum ada album', max: 120 }
+				],
+				defaults: { allLabel: 'Semua', emptyText: 'Album akan segera hadir.' }
+			},
+			{
+				key: 'album',
+				label: 'Halaman album',
+				description: 'Teks di setiap halaman album (/portofolio/…).',
+				alwaysVisible: true,
+				fields: [
+					{ kind: 'text', key: 'othersHeading', label: 'Judul album lainnya', max: 80 },
+					{ kind: 'link', key: 'button', label: 'Tombol di bawah album lainnya' },
+					{
+						kind: 'text',
+						key: 'playLabel',
+						label: 'Tombol putar video sematan',
+						max: 30,
+						hint: 'Diikuti nama layanan, misalnya "Putar dari YouTube".'
+					}
+				],
+				defaults: {
+					othersHeading: 'Album lainnya',
+					button: { label: 'Ceritakan hari bahagiamu', href: '/booking' },
+					playLabel: 'Putar dari'
+				}
 			}
 		]
 	},
@@ -474,6 +600,7 @@ const BASE_PAGES: PageDef[] = [
 		label: 'Booking',
 		path: 'booking',
 		sections: [
+			pageHero('Booking', 'Ceritakan rencanamu'),
 			{
 				key: 'intro',
 				label: 'Pembuka',
@@ -486,16 +613,67 @@ const BASE_PAGES: PageDef[] = [
 				}
 			},
 			{
+				key: 'form',
+				label: 'Formulir',
+				description: 'Label setiap isian. Pilihan jenis acara mengikuti data booking.',
+				alwaysVisible: true,
+				fields: [
+					{ kind: 'text', key: 'nameLabel', label: 'Label nama', max: 40 },
+					{ kind: 'text', key: 'phoneLabel', label: 'Label WhatsApp', max: 40 },
+					{ kind: 'text', key: 'phoneHint', label: 'Petunjuk WhatsApp', max: 120 },
+					{ kind: 'text', key: 'emailLabel', label: 'Label email', max: 40 },
+					{ kind: 'text', key: 'instagramLabel', label: 'Label Instagram', max: 40 },
+					{ kind: 'text', key: 'instagramHint', label: 'Petunjuk Instagram', max: 120 },
+					{ kind: 'text', key: 'eventTypeLabel', label: 'Label jenis acara', max: 40 },
+					{ kind: 'text', key: 'eventDateLabel', label: 'Label tanggal acara', max: 40 },
+					{ kind: 'text', key: 'venueLabel', label: 'Label lokasi', max: 40 },
+					{ kind: 'text', key: 'cityLabel', label: 'Label kota', max: 40 },
+					{ kind: 'text', key: 'packageLabel', label: 'Label paket', max: 40 },
+					{ kind: 'text', key: 'packageNone', label: 'Pilihan paket "belum tahu"', max: 40 },
+					{ kind: 'text', key: 'sourceLabel', label: 'Label sumber', max: 40 },
+					{ kind: 'text', key: 'sourcePlaceholder', label: 'Pilihan sumber kosong', max: 40 },
+					{ kind: 'text', key: 'messageLabel', label: 'Label pesan', max: 40 },
+					{ kind: 'text', key: 'submitLabel', label: 'Tombol kirim', max: 30 },
+					{ kind: 'text', key: 'sendingLabel', label: 'Tombol saat mengirim', max: 30 },
+					{ kind: 'text', key: 'errorText', label: 'Pesan bila ada isian salah', max: 120 }
+				],
+				defaults: {
+					nameLabel: 'Nama',
+					phoneLabel: 'No. WhatsApp',
+					phoneHint: 'Kami menghubungimu lewat nomor ini.',
+					emailLabel: 'Email',
+					instagramLabel: 'Instagram',
+					instagramHint: 'Contoh: @namakamu',
+					eventTypeLabel: 'Jenis acara',
+					eventDateLabel: 'Tanggal acara (utama)',
+					venueLabel: 'Lokasi / venue',
+					cityLabel: 'Kota',
+					packageLabel: 'Paket yang diminati',
+					packageNone: 'Belum tahu',
+					sourceLabel: 'Tahu kami dari mana',
+					sourcePlaceholder: 'Pilih…',
+					messageLabel: 'Pesan',
+					submitLabel: 'Kirim',
+					sendingLabel: 'Mengirim…',
+					errorText: 'Periksa lagi isian yang ditandai.'
+				}
+			},
+			{
 				key: 'thanks',
 				label: 'Terima kasih',
 				description: 'Ditampilkan setelah formulir terkirim.',
+				alwaysVisible: true,
 				fields: [
+					{ kind: 'text', key: 'script', label: 'Teks tulisan tangan', max: 40 },
 					{ kind: 'text', key: 'headline', label: 'Judul', max: 80 },
-					{ kind: 'richtext', key: 'body', label: 'Isi' }
+					{ kind: 'richtext', key: 'body', label: 'Isi' },
+					{ kind: 'link', key: 'button', label: 'Tombol' }
 				],
 				defaults: {
+					script: 'Terima kasih',
 					headline: 'Terima kasih!',
-					body: '<p>Pesanmu sudah kami terima. Kami akan menghubungimu lewat WhatsApp dalam 1×24 jam.</p>'
+					body: '<p>Pesanmu sudah kami terima. Kami akan menghubungimu lewat WhatsApp dalam 1×24 jam.</p>',
+					button: { label: 'Lihat portofolio', href: '/portofolio' }
 				}
 			}
 		]

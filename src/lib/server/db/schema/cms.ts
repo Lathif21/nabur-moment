@@ -1,8 +1,10 @@
 // CMS pages (docs/02-DATA-MODEL.md → page and page_section). One row per registry section; the
 // editor writes `draft`, Terbitkan copies it to `published`. Visibility waits for Terbitkan too.
+import { sql } from 'drizzle-orm';
 import {
 	bigint,
 	boolean,
+	check,
 	index,
 	jsonb,
 	pgTable,
@@ -73,6 +75,11 @@ export const pkg = pgTable(
 		name: text('name').notNull(),
 		/** Whole Rupiah, shown in full on the site */
 		price: bigint('price', { mode: 'number' }).notNull(),
+		/**
+		 * "Harga normal": optional higher price shown struck through next to `price` (a promo).
+		 * Display only: bookings and invoices always use `price`.
+		 */
+		normalPrice: bigint('normal_price', { mode: 'number' }),
 		inclusions: text('inclusions').array().default([]).notNull(),
 		note: text('note').default('').notNull(),
 		imageMediaId: mediaRef('image_media_id'),
@@ -82,7 +89,13 @@ export const pkg = pgTable(
 		position: text('position').notNull(),
 		createdAt: createdAt()
 	},
-	(t) => [index('package_category_idx').on(t.categoryId)]
+	(t) => [
+		index('package_category_idx').on(t.categoryId),
+		check(
+			'package_normal_price_gt_price',
+			sql`${t.normalPrice} is null or ${t.normalPrice} > ${t.price}`
+		)
+	]
 );
 
 export const addon = pgTable('addon', {

@@ -1,5 +1,5 @@
 // P1-04 "Done when": header / footer / meta tags on the public layout come from published
-// settings. Dev branch only; restores the original settings.
+// settings, including the menu and the header button. Dev branch only; restores the original settings.
 import { expect, test, type Page } from '@playwright/test';
 import { gotoFresh } from './helpers/fresh.ts';
 import { createDb } from '../../src/lib/server/db/client.ts';
@@ -53,7 +53,7 @@ async function login(page: Page) {
 	await expect(page).toHaveURL(/\/admin$/);
 }
 
-test('published settings drive the footer and meta tags', async ({ page, browser }) => {
+test('published settings drive the menu, footer and meta tags', async ({ page, browser }) => {
 	await page.setViewportSize({ width: 1280, height: 900 });
 	await login(page);
 	await page.goto('/admin/pengaturan/situs');
@@ -62,6 +62,9 @@ test('published settings drive the footer and meta tags', async ({ page, browser
 	await page.getByLabel('Kalimat di footer').fill(`Footer ${run}`);
 	await page.getByLabel('Nomor WhatsApp').fill('0812-3456-7890');
 	await page.getByLabel('Deskripsi situs (SEO)').fill(`Deskripsi ${run}`);
+	await page.getByRole('group', { name: 'Menu 2' }).getByLabel('Menu: teks').fill(`Kisah ${run}`);
+	await page.getByLabel('Tombol di header: teks').fill(`Pesan ${run}`);
+	await page.getByLabel('Judul menu di footer').fill(`Jelajah ${run}`);
 	await expect(page.getByText('Tersimpan')).toBeVisible();
 
 	// Not public before Terbitkan
@@ -79,6 +82,16 @@ test('published settings drive the footer and meta tags', async ({ page, browser
 	await expect(footer.getByRole('link', { name: /WhatsApp/ })).toHaveAttribute(
 		'href',
 		'https://wa.me/6281234567890'
+	);
+	await expect(footer).toContainText(`Jelajah ${run}`);
+	const header = visitor.getByRole('banner');
+	await expect(header.getByRole('link', { name: `Kisah ${run}` })).toHaveAttribute(
+		'href',
+		'/tentang'
+	);
+	await expect(header.getByRole('link', { name: `Pesan ${run}` })).toHaveAttribute(
+		'href',
+		'/booking'
 	);
 	await expect(visitor.locator('meta[name="description"]')).toHaveAttribute(
 		'content',

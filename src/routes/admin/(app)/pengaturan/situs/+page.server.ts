@@ -13,8 +13,8 @@ import {
 	publishSiteSettings,
 	revertSiteSettings
 } from '#lib/server/services/site-settings.ts';
+import { publicPathsFor } from '#lib/server/site.ts';
 import { storage } from '#lib/server/storage/index.ts';
-import { PAGES } from '#lib/cms/sections.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 // Pengaturan → Situs (03-SCREENS B8): identity, contacts, socials, footer, SEO defaults.
@@ -41,7 +41,7 @@ export const actions: Actions = {
 		return runSimpleAction(async () => {
 			await publishSiteSettings(db, user.id);
 			// Header, footer and meta tags are on every public page
-			await revalidate(PAGES.map((p) => p.path));
+			await revalidate(await publicPathsFor());
 		}, 'Pengaturan situs diterbitkan.');
 	},
 

@@ -14,6 +14,7 @@ import {
 	revertPage
 } from '#lib/server/services/cms-pages.ts';
 import { mediaByIds } from '#lib/server/services/media.ts';
+import { publicPathsFor } from '#lib/server/site.ts';
 import { storage } from '#lib/server/storage/index.ts';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -45,8 +46,8 @@ export const actions: Actions = {
 		if (!isPageKey(params.page)) error(404, 'Halaman tidak ditemukan.');
 		const page = params.page;
 		return runSimpleAction(async () => {
-			const { path } = await publishPage(db, page, user.id);
-			await revalidate([path]);
+			await publishPage(db, page, user.id);
+			await revalidate(await publicPathsFor(page));
 		}, 'Halaman diterbitkan. Perubahan sudah tampil di situs.');
 	},
 

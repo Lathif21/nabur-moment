@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import CmsLink from './CmsLink.svelte';
 	import Logo from './Logo.svelte';
-	import { socialUrl, type SiteSettings } from '#lib/cms/site-settings.ts';
-	import { bookingHref, siteNav } from '#lib/nav.ts';
+	import { menuLinks, socialUrl, type SiteSettings } from '#lib/cms/site-settings.ts';
 
 	type Props = {
 		/** Published site settings */
@@ -22,6 +21,8 @@
 			{ label: 'Email', href: site.email ? `mailto:${site.email}` : null }
 		].filter((l): l is { label: string; href: string } => !!l.href)
 	);
+	const nav = $derived(menuLinks(site.nav));
+	const cta = $derived(site.footerButton);
 	const year = new Date().getFullYear();
 </script>
 
@@ -32,16 +33,22 @@
 			{#if site.footerText}<p class="max-w-[36ch] text-lead">{site.footerText}</p>{/if}
 		</div>
 
-		<nav aria-label="Menu footer" class="flex flex-col gap-3">
-			<p class="eyebrow text-cream/80">Menu</p>
-			{#each siteNav as item (item.href)}
-				<a href={resolve(item.href)} class="w-fit hover:underline">{item.label}</a>
-			{/each}
-		</nav>
+		{#if nav.length}
+			<nav aria-label="Menu footer" class="flex flex-col gap-3">
+				{#if site.footerMenuHeading}
+					<p class="eyebrow text-cream/80">{site.footerMenuHeading}</p>
+				{/if}
+				{#each nav as item, i (i)}
+					<CmsLink href={item.href} class="w-fit hover:underline">{item.label}</CmsLink>
+				{/each}
+			</nav>
+		{/if}
 
 		<div class="flex flex-col gap-3">
 			{#if links.length}
-				<p class="eyebrow text-cream/80">Ikuti kami</p>
+				{#if site.footerSocialHeading}
+					<p class="eyebrow text-cream/80">{site.footerSocialHeading}</p>
+				{/if}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -- social profiles, WhatsApp and email from site settings -->
 				{#each links as l (l.label)}
 					<a
@@ -56,12 +63,15 @@
 				{/each}
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			{/if}
-			<a
-				href={resolve(bookingHref)}
-				class="mt-4 inline-flex w-fit items-center gap-2 eyebrow underline-offset-8 hover:underline"
-			>
-				Pesan sekarang <ArrowRight size={16} aria-hidden="true" />
-			</a>
+			{#if cta.label && cta.href}
+				<CmsLink
+					href={cta.href}
+					class="mt-4 inline-flex w-fit items-center gap-2 eyebrow underline-offset-8 hover:underline"
+				>
+					{cta.label}
+					<ArrowRight size={16} aria-hidden="true" />
+				</CmsLink>
+			{/if}
 		</div>
 	</div>
 	<div class="border-t border-cream/15">

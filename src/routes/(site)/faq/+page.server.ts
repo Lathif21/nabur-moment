@@ -7,5 +7,5 @@ export const load: PageServerLoad = async (event) => {
 		loadPublicPage(event, 'faq'),
 		loadPublicList(event, 'faq')
 	]);
-	return { ...page, faq: faq.data };
+	return { headerOverlay: page.sections.hero.visible, ...page, faq: faq.data };
 };

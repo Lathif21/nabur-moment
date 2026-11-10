@@ -7,5 +7,10 @@ export const load: PageServerLoad = async (event) => {
 		loadPublicPage(event, 'portfolio'),
 		loadPortfolio(event)
 	]);
-	return { ...page, albums: portfolio.albums, media: { ...page.media, ...portfolio.media } };
+	return {
+		headerOverlay: page.sections.hero.visible,
+		...page,
+		albums: portfolio.albums,
+		media: { ...page.media, ...portfolio.media }
+	};
 };

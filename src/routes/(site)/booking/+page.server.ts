@@ -21,6 +21,7 @@ export const load: PageServerLoad = async (event) => {
 		listLeadSources(db)
 	]);
 	return {
+		headerOverlay: page.sections.hero.visible,
 		...page,
 		packages: packages.data.categories.flatMap((c) =>
 			c.packages.map((p) => ({ id: p.id, name: p.name, category: c.name }))

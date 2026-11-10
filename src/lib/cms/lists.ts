@@ -19,6 +19,8 @@ export type PackageCard = {
 	id: string;
 	name: string;
 	price: number;
+	/** "Harga normal" shown struck through; only present when higher than `price` */
+	normalPrice?: number;
 	inclusions: string[];
 	note: string;
 	/** Media id */

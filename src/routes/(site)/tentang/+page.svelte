@@ -20,7 +20,11 @@
 </script>
 
 {#if s.hero.visible}
-	<PageHero title={s.hero.data.title as string} image={m(s.hero.data.image)} eyebrow="Tentang" />
+	<PageHero
+		title={s.hero.data.title as string}
+		image={m(s.hero.data.image)}
+		eyebrow={s.hero.data.eyebrow as string}
+	/>
 {:else}
 	<h1 class="sr-only">Tentang {data.site.businessName}</h1>
 {/if}
@@ -44,7 +48,7 @@
 {/if}
 
 {#if s.team.visible && members.length}
-	<Team {members} />
+	<Team heading={s.team.data.heading as string} {members} />
 {/if}
 
 {#if s.cta.visible}

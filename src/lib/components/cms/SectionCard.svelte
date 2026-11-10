@@ -122,7 +122,17 @@
 	{/if}
 
 	<div class="flex flex-col gap-4">
-		{#each def.fields as f (f.key)}
+		{#each def.fields as f, i (f.key)}
+			{#if f.group && f.group !== def.fields[i - 1]?.group}
+				<h3
+					class={[
+						'text-small font-semibold tracking-wide text-ink-2 uppercase',
+						i > 0 && 'mt-2 border-t border-line pt-4'
+					]}
+				>
+					{f.group}
+				</h3>
+			{/if}
 			<FieldInput
 				field={f}
 				bind:value={data[f.key]}

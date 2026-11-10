@@ -1,26 +1,42 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import PageHero from '#lib/components/site/sections/PageHero.svelte';
 	import { rupiah } from '#lib/format.ts';
+	import type { MediaItem } from '#lib/media/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
+	const hero = $derived(data.sections.hero);
 	const intro = $derived(data.sections.intro);
+	const list = $derived(data.sections.list.data);
 	const notes = $derived(data.sections.notes);
+	const m = (id: unknown): MediaItem | undefined =>
+		typeof id === 'string' ? data.media[id] : undefined;
 </script>
 
 <!-- Paket from the CMS: intro + published packages / add-ons + notes. P1-06 adds the full design. -->
-<section class="border-t border-sage section-pad">
+{#if hero.visible}
+	<PageHero
+		title={hero.data.title as string}
+		image={m(hero.data.image)}
+		eyebrow={hero.data.eyebrow as string}
+	/>
+{/if}
+
+<section class={['section-pad', !hero.visible && 'border-t border-sage']}>
 	<div class="mx-auto flex max-w-6xl flex-col gap-14">
 		{#if intro.visible}
 			<header class="mx-auto flex max-w-[60ch] flex-col gap-4 text-center">
 				{#if intro.data.eyebrow}<p class="eyebrow text-olive">{intro.data.eyebrow}</p>{/if}
-				<h1 class="font-display text-h1">{intro.data.headline}</h1>
+				<svelte:element this={hero.visible ? 'h2' : 'h1'} class="font-display text-h1"
+					>{intro.data.headline}</svelte:element
+				>
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised on save (cms-pages.ts) -->
 				<div class="prose-site text-lead">{@html intro.data.body}</div>
 			</header>
-		{:else}
-			<h1 class="text-center font-display text-h1">Paket</h1>
+		{:else if !hero.visible}
+			<h1 class="sr-only">{data.meta.title}</h1>
 		{/if}
 
 		{#each data.packages.categories as cat (cat.id)}
@@ -56,19 +72,20 @@
 							{#if p.note}<p class="text-small opacity-80">{p.note}</p>{/if}
 							<a
 								href={resolve(`booking?paket=${p.id}` as 'booking')}
-								class={['site-btn mt-auto', p.featured && 'site-btn--inverse']}>Pilih paket</a
+								class={['site-btn mt-auto', p.featured && 'site-btn--inverse']}
+								>{list.chooseLabel}</a
 							>
 						</li>
 					{/each}
 				</ul>
 			</section>
 		{:else}
-			<p class="text-center text-lead text-ink-2">Paket akan segera tersedia.</p>
+			<p class="text-center text-lead text-ink-2">{list.emptyText}</p>
 		{/each}
 
 		{#if data.packages.addons.length}
 			<section aria-labelledby="addons" class="flex flex-col gap-4">
-				<h2 id="addons" class="font-display text-h2">Add-on</h2>
+				<h2 id="addons" class="font-display text-h2">{list.addonsHeading}</h2>
 				<ul class="divide-y divide-sage border-y border-sage">
 					{#each data.packages.addons as a (a.id)}
 						<li class="flex flex-wrap items-baseline justify-between gap-2 py-4">

@@ -22,27 +22,37 @@ export const categorySchema = z.object({
 	name: z.string().trim().min(1, 'Nama kategori wajib diisi.').max(60)
 });
 
-export const packageSchema = z.object({
-	id: optionalId,
-	categoryId: z.uuid('Pilih kategori.'),
-	name: z.string().trim().min(1, 'Nama paket wajib diisi.').max(80),
-	price: money,
-	/** One inclusion per line */
-	inclusions: z
-		.string()
-		.max(3000)
-		.default('')
-		.transform((v) =>
-			v
-				.split('\n')
-				.map((l) => l.replace(/^[-•*]\s*/, '').trim())
-				.filter(Boolean)
-		),
-	note: z.string().trim().max(300).default(''),
-	imageMediaId: optionalId,
-	featured: bool,
-	visible: bool
-});
+export const packageSchema = z
+	.object({
+		id: optionalId,
+		categoryId: z.uuid('Pilih kategori.'),
+		name: z.string().trim().min(1, 'Nama paket wajib diisi.').max(80),
+		price: money,
+		/** "Harga normal" (struck through on the site); empty = no promo */
+		normalPrice: z
+			.union([z.literal(''), money])
+			.optional()
+			.transform((v) => (v === '' || v === undefined ? null : v)),
+		/** One inclusion per line */
+		inclusions: z
+			.string()
+			.max(3000)
+			.default('')
+			.transform((v) =>
+				v
+					.split('\n')
+					.map((l) => l.replace(/^[-•*]\s*/, '').trim())
+					.filter(Boolean)
+			),
+		note: z.string().trim().max(300).default(''),
+		imageMediaId: optionalId,
+		featured: bool,
+		visible: bool
+	})
+	.refine((d) => d.normalPrice === null || d.normalPrice > d.price, {
+		message: 'Harga normal harus lebih tinggi dari harga paket, atau kosongkan.',
+		path: ['normalPrice']
+	});
 
 export const addonSchema = z.object({
 	id: optionalId,

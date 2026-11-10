@@ -1,0 +1,2 @@
+ALTER TABLE "package" ADD COLUMN "normal_price" bigint;--> statement-breakpoint
+ALTER TABLE "package" ADD CONSTRAINT "package_normal_price_gt_price" CHECK ("package"."normal_price" is null or "package"."normal_price" > "package"."price");

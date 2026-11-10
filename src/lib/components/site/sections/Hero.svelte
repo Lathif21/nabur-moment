@@ -2,6 +2,7 @@
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import { MediaQuery } from 'svelte/reactivity';
+	import CmsLink from '../CmsLink.svelte';
 	// The hero text fonts, preloaded so the first screen does not wait for the CSS to find them
 	import pinyon from '@fontsource/pinyon-script/files/pinyon-script-latin-400-normal.woff2?url';
 	import playfair from '@fontsource/playfair-display/files/playfair-display-latin-400-normal.woff2?url';
@@ -33,9 +34,28 @@
 		next?: string;
 		/** Black & white treatment, like the reference */
 		mono?: boolean;
+		/** Up to two buttons under the caption; an entry without label or link is skipped */
+		buttons?: { label: string; href: string }[];
+		/** How dark the forest veil over the photo is */
+		overlay?: 'soft' | 'medium' | 'strong';
+		/** Text of the scroll cue; empty hides the cue */
+		scrollLabel?: string;
 	};
 
-	let { media, script, headline, accent, caption, next, mono = true }: Props = $props();
+	let {
+		media,
+		script,
+		headline,
+		accent,
+		caption,
+		next,
+		mono = true,
+		buttons = [],
+		overlay = 'medium',
+		scrollLabel = 'Gulir'
+	}: Props = $props();
+
+	const shownButtons = $derived(buttons.filter((b) => b.label && b.href));
 
 	const reducedMotion = new MediaQuery('prefers-reduced-motion: reduce');
 	let video = $state<HTMLVideoElement>();
@@ -122,7 +142,7 @@
 		/>
 	{/if}
 	<!-- Forest veil: darker at the top (header) and bottom (cue), lighter behind the words -->
-	<div class="hero-veil" aria-hidden="true"></div>
+	<div class="hero-veil hero-veil--{overlay}" aria-hidden="true"></div>
 
 	<div class="hero-copy flex max-w-5xl flex-col items-center">
 		{#if script}
@@ -136,6 +156,17 @@
 		</h1>
 		{#if caption}
 			<p class="mt-6 eyebrow text-cream/90">{caption}</p>
+		{/if}
+		{#if shownButtons.length}
+			<div class="mt-10 flex flex-wrap justify-center gap-3">
+				{#each shownButtons as b, i (i)}
+					<CmsLink
+						href={b.href}
+						class={['site-btn', i === 0 ? 'site-btn--inverse' : 'site-btn--outline-inverse']}
+						>{b.label}</CmsLink
+					>
+				{/each}
+			</div>
 		{/if}
 	</div>
 
@@ -153,13 +184,14 @@
 		</button>
 	{/if}
 
-	{#if next}
+	{#if next && scrollLabel}
 		<a
 			href="#{next}"
 			class="absolute right-5 bottom-6 flex flex-col items-center gap-3 text-cream/90 hover:text-cream lg:right-10"
 		>
 			<span class="hero-cue-line" aria-hidden="true"></span>
-			<span class="font-display text-caption tracking-[0.16em] uppercase italic">Gulir</span>
+			<span class="font-display text-caption tracking-[0.16em] uppercase italic">{scrollLabel}</span
+			>
 		</a>
 	{/if}
 </section>
@@ -178,18 +210,36 @@
 	.hero-media--mono {
 		filter: grayscale(1) contrast(1.2) brightness(0.62);
 	}
+	/* Veil strength from the CMS: the top stays dark enough for the header, the bottom for the cue */
 	.hero-veil {
+		--veil-top: 55%;
+		--veil-mid: 20%;
+		--veil-low: 25%;
+		--veil-bottom: 75%;
 		position: absolute;
 		inset: 0;
 		z-index: -1;
 		background: linear-gradient(
 			to bottom,
-			color-mix(in srgb, var(--color-forest) 55%, transparent) 0%,
-			color-mix(in srgb, var(--color-forest) 20%, transparent) 35%,
-			color-mix(in srgb, var(--color-forest) 25%, transparent) 65%,
-			color-mix(in srgb, var(--color-forest) 75%, transparent) 100%
+			color-mix(in srgb, var(--color-forest) var(--veil-top), transparent) 0%,
+			color-mix(in srgb, var(--color-forest) var(--veil-mid), transparent) 35%,
+			color-mix(in srgb, var(--color-forest) var(--veil-low), transparent) 65%,
+			color-mix(in srgb, var(--color-forest) var(--veil-bottom), transparent) 100%
 		);
 	}
+	.hero-veil--soft {
+		--veil-top: 45%;
+		--veil-mid: 5%;
+		--veil-low: 10%;
+		--veil-bottom: 60%;
+	}
+	.hero-veil--strong {
+		--veil-top: 70%;
+		--veil-mid: 45%;
+		--veil-low: 50%;
+		--veil-bottom: 85%;
+	}
+
 	.hero-copy > :global(*) {
 		animation: hero-rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 	}
@@ -198,6 +248,9 @@
 	}
 	.hero-copy > :global(:nth-child(3)) {
 		animation-delay: 300ms;
+	}
+	.hero-copy > :global(:nth-child(4)) {
+		animation-delay: 450ms;
 	}
 	.hero-cue-line {
 		display: block;

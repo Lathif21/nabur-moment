@@ -187,6 +187,16 @@
 			color: var(--color-cream);
 		}
 	}
+	/* Cream outline on a dark photo (second hero button) */
+	.site-btn--outline-inverse {
+		border-color: var(--color-cream);
+		background: transparent;
+		color: var(--color-cream);
+		&:hover {
+			background: var(--color-cream);
+			color: var(--color-forest);
+		}
+	}
 
 	/* ---------- Admin ---------- */
 

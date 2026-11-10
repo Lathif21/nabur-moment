@@ -25,6 +25,27 @@ export function embedSrc(provider: string | null, url: string | null): string | 
 	return null;
 }
 
+/**
+ * Still image for an embed, from the provider's public thumbnail host (no API key, nothing
+ * stored). Only YouTube has one: Instagram and TikTok give no thumbnail without an app token.
+ * `src` is the HD still; `fallback` the 320 px one every video has (HD is missing on old uploads).
+ */
+export function embedThumb(
+	provider: string | null,
+	url: string | null
+): { src: string; fallback: string } | null {
+	if (provider !== 'youtube' || !url) return null;
+	let id: string | null;
+	try {
+		id = new URL(url).searchParams.get('v');
+	} catch {
+		return null;
+	}
+	if (!id || !/^[\w-]+$/.test(id)) return null;
+	const still = (name: string) => `https://i.ytimg.com/vi/${id}/${name}.jpg`;
+	return { src: still('maxresdefault'), fallback: still('mqdefault') };
+}
+
 /** Vertical players (Reels, TikTok) vs 16:9 (YouTube) */
 export function embedAspect(provider: string | null): string {
 	return provider === 'youtube' ? '16 / 9' : '9 / 16';

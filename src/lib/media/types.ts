@@ -7,12 +7,16 @@ export type MediaItem = {
 	id: string;
 	kind: MediaKind;
 	filename: string | null;
-	/** Small preview for grids (≈480 px image or the video poster); null for embeds */
+	/**
+	 * Small preview for grids (≈480 px image or the video poster); for embeds the provider's still
+	 * (YouTube only, else null)
+	 */
 	thumb: string | null;
 	/** Images: largest rendition; videos: the MP4; embeds: the provider URL */
 	src: string | null;
 	/** Images only */
 	srcset: string | null;
+	/** Videos: the poster frame; embeds: a low-res still to fall back to when `thumb` fails */
 	poster: string | null;
 	width: number | null;
 	height: number | null;

@@ -72,7 +72,10 @@ export function cleanSection(def: SectionDef, input: unknown): Record<string, un
 
 /* ---------- Rows ---------- */
 
-/** Creates missing rows from the registry (idempotent). Defaults start out published. */
+/**
+ * Creates missing rows from the registry (idempotent). Defaults start out published; optional
+ * sections (`startHidden`) start out hidden, so adding one to the registry changes nothing on the site.
+ */
 export async function ensureSections(db: DbOrTx, page?: PageKey) {
 	const pages = page ? [PAGE_BY_KEY.get(page)!] : PAGES;
 	const rows = pages.flatMap((p) =>
@@ -82,6 +85,8 @@ export async function ensureSections(db: DbOrTx, page?: PageKey) {
 			sort: i,
 			draft: s.defaults,
 			published: s.defaults,
+			draftVisible: !s.startHidden,
+			visible: !s.startHidden,
 			publishedAt: new Date()
 		}))
 	);
@@ -156,11 +161,12 @@ export async function saveSectionDraft(
 	const def = getSection(page, key);
 	if (!def) throw new ServiceError('Bagian halaman tidak ditemukan.');
 	const draft = cleanSection(def, input.data);
+	const visible = def.alwaysVisible ? true : input.visible;
 	await ensureSections(db, page);
 	return db.transaction(async (tx) => {
 		const [row] = await tx
 			.update(pageSection)
-			.set({ draft, draftVisible: input.visible, updatedAt: new Date(), updatedBy: userId })
+			.set({ draft, draftVisible: visible, updatedAt: new Date(), updatedBy: userId })
 			.where(and(eq(pageSection.page, page), eq(pageSection.key, key)))
 			.returning();
 		await rebuildUsage(tx, def, page, draft, row.published);
@@ -201,13 +207,15 @@ export async function publishPage(db: DbOrTx, page: PageKey, userId: string | nu
 		for (const s of def.sections) {
 			const row = rows.find((r) => r.key === s.key)!;
 			const content = cleanSection(s, row.draft);
-			if (row.draftVisible) await assertAltText(tx, s, content);
+			const visible = s.alwaysVisible || row.draftVisible;
+			if (visible) await assertAltText(tx, s, content);
 			await tx
 				.update(pageSection)
 				.set({
 					draft: content,
 					published: content,
-					visible: row.draftVisible,
+					draftVisible: visible,
+					visible,
 					publishedAt: now,
 					updatedBy: userId
 				})
@@ -256,7 +264,8 @@ export async function readPage(
 		const raw = opts.preview ? row?.draft : row?.published;
 		const parsed = sectionSchema(s).safeParse(raw ?? s.defaults);
 		out[s.key] = {
-			visible: row ? (opts.preview ? row.draftVisible : row.visible) : true,
+			visible:
+				s.alwaysVisible || (row ? (opts.preview ? row.draftVisible : row.visible) : !s.startHidden),
 			data: (parsed.success ? parsed.data : s.defaults) as Record<string, unknown>
 		};
 	}

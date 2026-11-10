@@ -92,6 +92,7 @@
 				<SectionCard
 					saveUrl={resolve('/admin/api/cms/[page]/[key]', { page: data.pageKey, key: s.key })}
 					def={s}
+					toggle={!s.alwaysVisible}
 					{initial}
 					{media}
 					canEdit={data.canEdit}

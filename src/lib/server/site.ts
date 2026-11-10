@@ -1,8 +1,9 @@
 // Public pages: published CMS content, or the draft with `?preview=1` for a logged-in admin who
 // may read Halaman. Previews are never cached (docs/04-ARCHITECTURE.md → CMS content flow).
 import type { RequestEvent } from '@sveltejs/kit';
-import type { ListKey } from '#lib/cms/lists.ts';
-import { PAGE_BY_KEY, type PageKey } from '#lib/cms/sections.ts';
+import type { ListKey, PublishedAlbum } from '#lib/cms/lists.ts';
+import { albumCoverId } from '#lib/media/cover.ts';
+import { PAGE_BY_KEY, PAGES, type PageKey } from '#lib/cms/sections.ts';
 import type { MediaItem } from '#lib/media/types.ts';
 import { can } from '#lib/permissions.ts';
 import { ISR_BYPASS_TOKEN } from '$app/env/private';
@@ -70,15 +71,38 @@ export async function loadPublicList<K extends ListKey>(event: SiteEvent, list: 
 	return { data, media };
 }
 
-/** /portofolio: published albums (working copy in preview) with their cover images only */
+/** Media of the given albums' covers and items, by id */
+async function albumMedia(albums: PublishedAlbum[]) {
+	const media: Record<string, MediaItem> = {};
+	if (!storage) return media;
+	const ids = albums.flatMap((a) => [a.cover, ...a.items.map((i) => i.media)]);
+	const found = await mediaByIds(
+		db,
+		ids.filter((v): v is string => !!v)
+	);
+	for (const m of found) media[m.id] = toMediaItem(m, storage);
+	return media;
+}
+
+/**
+ * Albums with `cover` resolved to what the site shows (see albumCoverId: the chosen cover, else the
+ * first item with a picture, so an album of embeds shows its first YouTube still) and `items`
+ * dropped: lists only show covers.
+ */
+function withCovers(albums: PublishedAlbum[], media: Record<string, MediaItem>) {
+	const covers: Record<string, MediaItem> = {};
+	const list = albums.map(({ items, ...a }) => {
+		const cover = albumCoverId({ cover: a.cover, items }, media);
+		if (cover) covers[cover] = media[cover];
+		return { ...a, cover };
+	});
+	return { albums: list, media: covers };
+}
+
+/** /portofolio and Beranda: every published album (working copy in preview) with its cover */
 export async function loadPortfolio(event: SiteEvent) {
 	const albums = await readList(db, 'portfolio', { preview: isPreview(event) });
-	const media: Record<string, MediaItem> = {};
-	if (storage) {
-		const covers = albums.map((a) => a.cover).filter((v): v is string => !!v);
-		for (const m of await mediaByIds(db, covers)) media[m.id] = toMediaItem(m, storage);
-	}
-	return { albums, media };
+	return withCovers(albums, await albumMedia(albums));
 }
 
 /**
@@ -87,30 +111,25 @@ export async function loadPortfolio(event: SiteEvent) {
  */
 export async function loadAlbum(event: SiteEvent, slug: string) {
 	const albums = await readList(db, 'portfolio', { preview: isPreview(event) });
-	const album = albums.find((a) => a.slug === slug) ?? null;
-	if (!album) return null;
-	const others = albums.filter((a) => a.id !== album.id).slice(0, 3);
-	const media: Record<string, MediaItem> = {};
-	if (storage) {
-		const ids = [
-			...(album.cover ? [album.cover] : []),
-			...album.items.map((i) => i.media),
-			...others.map((a) => a.cover).filter((v): v is string => !!v)
-		];
-		for (const m of await mediaByIds(db, ids)) media[m.id] = toMediaItem(m, storage);
-	}
+	const found = albums.find((a) => a.slug === slug);
+	if (!found) return null;
+	const rest = albums.filter((a) => a.id !== found.id).slice(0, 3);
+	const media = await albumMedia([found, ...rest]);
+	const album = { ...found, cover: albumCoverId(found, media) };
+	const others = withCovers(rest, media).albums;
 	return { album, others, media };
 }
 
-/** Beranda "featured": the first `count` published albums flagged featured, covers only */
-export async function loadFeaturedAlbums(event: SiteEvent, count: number) {
-	const albums = (await readList(db, 'portfolio', { preview: isPreview(event) }))
-		.filter((a) => a.featured)
-		.slice(0, count);
-	const media: Record<string, MediaItem> = {};
-	if (storage) {
-		const covers = albums.map((a) => a.cover).filter((v): v is string => !!v);
-		for (const m of await mediaByIds(db, covers)) media[m.id] = toMediaItem(m, storage);
-	}
-	return { albums, media };
+/**
+ * Public paths that show a CMS page's content, to revalidate after Terbitkan. Album pages show the
+ * Portofolio page's "Halaman album" texts; the thank-you page shows Booking's. No page = site
+ * settings (header and footer are on every public page).
+ */
+export async function publicPathsFor(page?: PageKey): Promise<string[]> {
+	const albums = async () => (await readList(db, 'portfolio')).map((a) => `portofolio/${a.slug}`);
+	if (!page) return [...PAGES.map((p) => p.path), 'booking/terima-kasih', ...(await albums())];
+	const path = PAGE_BY_KEY.get(page)!.path;
+	if (page === 'portfolio') return [path, ...(await albums())];
+	if (page === 'inquiry') return [path, 'booking/terima-kasih'];
+	return [path];
 }

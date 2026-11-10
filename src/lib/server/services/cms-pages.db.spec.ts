@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { createDb, type Tx } from '../db/client';
-import { media, mediaUsage } from '../db/schema/index';
+import { media, mediaUsage, pageSection } from '../db/schema/index';
 import {
 	getPageForEdit,
 	listPages,
@@ -153,5 +153,27 @@ describe.runIf(isDevDb)('CMS pages', () => {
 			await tx.update(media).set({ alt: 'Pengantin tersenyum' }).where(eq(media.id, img.id));
 			await publishPage(tx, 'home', null);
 			expect((await readPage(tx, 'home')).intro.data.image).toBe(img.id);
+		}));
+
+	it('optional heroes start hidden; list labels stay visible even when hidden in the editor', () =>
+		inRollback(async (tx) => {
+			await tx.delete(pageSection).where(eq(pageSection.page, 'packages'));
+			const sections = await getPageForEdit(tx, 'packages');
+			expect(sections.find((s) => s.key === 'hero')!.draftVisible).toBe(false);
+			expect((await readPage(tx, 'packages')).hero.visible).toBe(false);
+
+			const list = sections.find((s) => s.key === 'list')!;
+			await saveSectionDraft(
+				tx,
+				'packages',
+				'list',
+				{ data: { ...list.draft, chooseLabel: 'Ambil paket' }, visible: false },
+				null
+			);
+			await publishPage(tx, 'packages', null);
+			const live = await readPage(tx, 'packages');
+			expect(live.list.visible).toBe(true);
+			expect(live.list.data.chooseLabel).toBe('Ambil paket');
+			expect(live.hero.visible).toBe(false);
 		}));
 });

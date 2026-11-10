@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { menuLinks, SITE_SETTINGS } from './site-settings.ts';
 import { mediaRefs, PAGES, sectionSchema } from './sections.ts';
 
 describe('section registry', () => {
@@ -43,6 +44,38 @@ describe('section registry', () => {
 		for (const p of PAGES) {
 			const keys = p.sections.map((s) => s.key);
 			expect(new Set(keys).size).toBe(keys.length);
+		}
+	});
+
+	it('site settings: defaults pass the schema; menu links need a label and a safe link', () => {
+		expect(sectionSchema(SITE_SETTINGS).parse(SITE_SETTINGS.defaults)).toEqual(
+			SITE_SETTINGS.defaults
+		);
+		const parsed = sectionSchema(SITE_SETTINGS).parse({
+			nav: [{ link: { label: 'Tentang', href: '/tentang' } }, { link: { label: '', href: '/x' } }]
+		});
+		expect(menuLinks(parsed.nav as never)).toEqual([{ label: 'Tentang', href: '/tentang' }]);
+		expect(() =>
+			sectionSchema(SITE_SETTINGS).parse({
+				nav: [{ link: { label: 'x', href: 'javascript:alert(1)' } }]
+			})
+		).toThrow();
+	});
+
+	it('old stored content gains the new fields with their defaults', () => {
+		const hero = PAGES[0].sections[0];
+		const parsed = sectionSchema(hero).parse({ headline: 'Halo', tone: 'color' });
+		expect(parsed).toMatchObject({
+			button: { label: '', href: '' },
+			overlay: 'medium',
+			scrollLabel: 'Gulir'
+		});
+	});
+
+	it('every inner page has an optional hero that starts hidden', () => {
+		for (const key of ['packages', 'faq', 'portfolio', 'inquiry']) {
+			const hero = PAGES.find((p) => p.key === key)!.sections.find((s) => s.key === 'hero');
+			expect(hero?.startHidden, key).toBe(true);
 		}
 	});
 });

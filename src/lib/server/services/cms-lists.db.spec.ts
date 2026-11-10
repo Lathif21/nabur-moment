@@ -82,12 +82,30 @@ describe.runIf(isDevDb)('CMS lists', () => {
 			const base = {
 				id: null,
 				categoryId: cat.id,
+				normalPrice: null,
 				inclusions: ['Video 1 menit'],
 				note: '',
 				imageMediaId: null,
 				featured: false
 			};
 			await savePackage(tx, { ...base, name: 'Silver', price: 5_000_000, visible: true });
+			await savePackage(tx, {
+				...base,
+				name: 'Gold Promo',
+				price: 8_000_000,
+				normalPrice: 10_000_000,
+				visible: true
+			});
+			// Harga normal must be above the price
+			await expect(
+				savePackage(tx, {
+					...base,
+					name: 'X',
+					price: 5_000_000,
+					normalPrice: 5_000_000,
+					visible: true
+				})
+			).rejects.toBeInstanceOf(ServiceError);
 			await savePackage(tx, { ...base, name: 'Rahasia', price: 1, visible: false });
 			await saveAddon(tx, {
 				id: null,
@@ -108,8 +126,11 @@ describe.runIf(isDevDb)('CMS lists', () => {
 			await publishList(tx, 'packages', null);
 			const live = await readList(tx, 'packages');
 			const mine = live.categories.find((c) => c.id === cat.id)!;
-			expect(mine.packages.map((p) => p.name)).toEqual(['Silver']);
+			expect(mine.packages.map((p) => p.name)).toEqual(['Silver', 'Gold Promo']);
 			expect(mine.packages[0]).toMatchObject({ price: 5_000_000, inclusions: ['Video 1 menit'] });
+			// No promo: the key is left out, so older published snapshots stay "not dirty"
+			expect(mine.packages[0]).not.toHaveProperty('normalPrice');
+			expect(mine.packages[1]).toMatchObject({ price: 8_000_000, normalPrice: 10_000_000 });
 			expect(live.addons.map((a) => a.name)).toEqual(['Drone']);
 			// Dummy categories without visible packages are not shown
 			expect(live.categories.every((c) => c.packages.length > 0)).toBe(true);

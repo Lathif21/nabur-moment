@@ -52,6 +52,9 @@
 		accent={s.hero.data.accent as string}
 		caption={s.hero.data.caption as string}
 		mono={s.hero.data.tone !== 'color'}
+		buttons={[s.hero.data.button as Link, s.hero.data.button2 as Link]}
+		overlay={s.hero.data.overlay as 'soft' | 'medium' | 'strong'}
+		scrollLabel={s.hero.data.scrollLabel as string}
 		next={first ? `beranda-${first}` : undefined}
 	/>
 {/if}
@@ -83,11 +86,11 @@
 	<Ticker words={(s.ticker.data.words as { word: string }[]).map((w) => w.word).filter(Boolean)} />
 {/if}
 
-{#if s.featured.visible && data.featured.length}
+{#if s.featured.visible && data.albums.length}
 	{@render anchor('featured')}
 	<FeaturedAlbums
 		heading={s.featured.data.heading as string}
-		albums={data.featured}
+		albums={data.albums}
 		media={data.media}
 	/>
 {/if}
@@ -95,6 +98,7 @@
 {#if s.packages.visible}
 	{@render anchor('packages')}
 	<PackagesTeaser
+		eyebrow={s.packages.data.eyebrow as string}
 		heading={s.packages.data.heading as string}
 		body={s.packages.data.body as string}
 		button={s.packages.data.button as Link}

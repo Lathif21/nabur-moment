@@ -40,7 +40,12 @@
 
 	function blankItem() {
 		if (field.kind !== 'list') return {};
-		return Object.fromEntries(field.fields.map((f) => [f.key, f.kind === 'image' ? null : '']));
+		return Object.fromEntries(
+			field.fields.map((f) => [
+				f.key,
+				f.kind === 'image' ? null : f.kind === 'link' ? { label: '', href: '' } : ''
+			])
+		);
 	}
 </script>
 

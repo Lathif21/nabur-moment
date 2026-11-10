@@ -4,6 +4,7 @@
 	import type { Path } from '$app/types';
 	import SiteFooter from '#lib/components/site/SiteFooter.svelte';
 	import SiteHeader from '#lib/components/site/SiteHeader.svelte';
+	import { menuLinks } from '#lib/cms/site-settings.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
@@ -55,7 +56,14 @@
 >
 
 <div class="flex min-h-dvh flex-col">
-	<SiteHeader {overlay} name={site.businessName} {logoLight} {logoDark} />
+	<SiteHeader
+		{overlay}
+		name={site.businessName}
+		{logoLight}
+		{logoDark}
+		nav={menuLinks(site.nav)}
+		button={site.navButton}
+	/>
 	<main id="konten" class="flex-1">
 		{@render children()}
 	</main>

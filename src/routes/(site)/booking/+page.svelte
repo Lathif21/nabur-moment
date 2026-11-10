@@ -2,16 +2,20 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import CmsImage from '#lib/components/site/CmsImage.svelte';
+	import PageHero from '#lib/components/site/sections/PageHero.svelte';
 	import { EVENT_TYPES } from '#lib/crm.ts';
 	import type { MediaItem } from '#lib/media/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 
+	const hero = $derived(data.sections.hero);
 	const intro = $derived(data.sections.intro);
-	const image = $derived(
-		typeof intro.data.image === 'string' ? (data.media[intro.data.image] as MediaItem) : undefined
-	);
+	/** Form labels from the CMS "Formulir" card */
+	const t = $derived(data.sections.form.data as Record<string, string>);
+	const m = (id: unknown): MediaItem | undefined =>
+		typeof id === 'string' ? data.media[id] : undefined;
+	const image = $derived(m(intro.data.image));
 	const fields = $derived((form?.fields ?? {}) as Record<string, string>);
 	const values = $derived((form?.values ?? {}) as Record<string, string>);
 	// ?paket=<id> from "Pilih paket"; read in the browser because cached pages ignore the query
@@ -22,12 +26,22 @@
 	const describedBy = (k: string) => (fields[k] ? `${k}-error` : undefined);
 </script>
 
-<section class="border-t border-sage section-pad">
+{#if hero.visible}
+	<PageHero
+		title={hero.data.title as string}
+		image={m(hero.data.image)}
+		eyebrow={hero.data.eyebrow as string}
+	/>
+{/if}
+
+<section class={['section-pad', !hero.visible && 'border-t border-sage']}>
 	<div class="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-20">
 		<header class="flex flex-col gap-5">
 			{#if intro.visible}
 				{#if intro.data.eyebrow}<p class="eyebrow text-olive">{intro.data.eyebrow}</p>{/if}
-				<h1 class="font-display text-h1">{intro.data.headline}</h1>
+				<svelte:element this={hero.visible ? 'h2' : 'h1'} class="font-display text-h1"
+					>{intro.data.headline}</svelte:element
+				>
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised on save (cms-pages.ts) -->
 				<div class="prose-site text-lead">{@html intro.data.body}</div>
 				{#if image}
@@ -37,8 +51,8 @@
 						class="mt-4 hidden aspect-4/5 w-full object-cover lg:block"
 					/>
 				{/if}
-			{:else}
-				<h1 class="font-display text-h1">Booking</h1>
+			{:else if !hero.visible}
+				<h1 class="sr-only">{data.meta.title}</h1>
 			{/if}
 		</header>
 
@@ -56,7 +70,7 @@
 		>
 			{#if form?.fields}
 				<p role="alert" class="bg-danger-bg px-4 py-3 text-small font-semibold text-danger">
-					Periksa lagi isian yang ditandai.
+					{t.errorText}
 				</p>
 			{/if}
 
@@ -96,27 +110,27 @@
 				</div>
 			{/snippet}
 
-			{@render text('name', 'Nama', { required: true, autocomplete: 'name' })}
-			{@render text('phone', 'No. WhatsApp', {
+			{@render text('name', t.nameLabel, { required: true, autocomplete: 'name' })}
+			{@render text('phone', t.phoneLabel, {
 				type: 'tel',
 				required: true,
 				autocomplete: 'tel',
 				inputmode: 'tel',
-				hint: 'Kami menghubungimu lewat nomor ini.'
+				hint: t.phoneHint
 			})}
 			<div class="grid gap-5 sm:grid-cols-2">
-				{@render text('email', 'Email', {
+				{@render text('email', t.emailLabel, {
 					type: 'email',
 					autocomplete: 'email',
 					inputmode: 'email'
 				})}
-				{@render text('instagram', 'Instagram', { hint: 'Contoh: @namakamu' })}
+				{@render text('instagram', t.instagramLabel, { hint: t.instagramHint })}
 			</div>
 
 			<div class="grid gap-5 sm:grid-cols-2">
 				<div class="flex flex-col gap-1.5">
 					<label for="f-eventType" class="text-small font-semibold"
-						>Jenis acara<span class="text-danger" aria-hidden="true"> *</span></label
+						>{t.eventTypeLabel}<span class="text-danger" aria-hidden="true"> *</span></label
 					>
 					<select
 						id="f-eventType"
@@ -137,27 +151,27 @@
 							{err('eventType')}
 						</p>{/if}
 				</div>
-				{@render text('eventDate', 'Tanggal acara (utama)', { type: 'date' })}
+				{@render text('eventDate', t.eventDateLabel, { type: 'date' })}
 			</div>
 			<div class="grid gap-5 sm:grid-cols-2">
-				{@render text('venue', 'Lokasi / venue')}
-				{@render text('city', 'Kota', { autocomplete: 'address-level2' })}
+				{@render text('venue', t.venueLabel)}
+				{@render text('city', t.cityLabel, { autocomplete: 'address-level2' })}
 			</div>
 
 			<div class="grid gap-5 sm:grid-cols-2">
 				<div class="flex flex-col gap-1.5">
-					<label for="f-packageId" class="text-small font-semibold">Paket yang diminati</label>
+					<label for="f-packageId" class="text-small font-semibold">{t.packageLabel}</label>
 					<select id="f-packageId" name="packageId" class="input min-h-12! rounded-btn!">
-						<option value="belum" selected={!preselected}>Belum tahu</option>
+						<option value="belum" selected={!preselected}>{t.packageNone}</option>
 						{#each data.packages as p (p.id)}
 							<option value={p.id} selected={preselected === p.id}>{p.name} · {p.category}</option>
 						{/each}
 					</select>
 				</div>
 				<div class="flex flex-col gap-1.5">
-					<label for="f-sourceId" class="text-small font-semibold">Tahu kami dari mana</label>
+					<label for="f-sourceId" class="text-small font-semibold">{t.sourceLabel}</label>
 					<select id="f-sourceId" name="sourceId" class="input min-h-12! rounded-btn!">
-						<option value="">Pilih…</option>
+						<option value="">{t.sourcePlaceholder}</option>
 						{#each data.sources as s (s.id)}
 							<option value={s.id} selected={values.sourceId === s.id}>{s.name}</option>
 						{/each}
@@ -166,7 +180,7 @@
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<label for="f-message" class="text-small font-semibold">Pesan</label>
+				<label for="f-message" class="text-small font-semibold">{t.messageLabel}</label>
 				<textarea
 					id="f-message"
 					name="message"
@@ -183,7 +197,7 @@
 			</div>
 
 			<button type="submit" class="site-btn mt-2 w-full sm:w-fit" disabled={sending}>
-				{sending ? 'Mengirim…' : 'Kirim'}
+				{sending ? t.sendingLabel : t.submitLabel}
 			</button>
 		</form>
 	</div>

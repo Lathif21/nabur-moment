@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Play from '@lucide/svelte/icons/play';
+	import CmsLink from '#lib/components/site/CmsLink.svelte';
+	import CoverImage from '#lib/components/site/CoverImage.svelte';
 	import Lightbox from '#lib/components/site/Lightbox.svelte';
 	import { paragraphs } from '#lib/cms/lists.ts';
 	import { EVENT_TYPE_LABEL, type EventType } from '#lib/crm.ts';
@@ -12,6 +14,14 @@
 	let { data }: PageProps = $props();
 
 	const album = $derived(data.album);
+	/** Texts from the Portofolio page's "Halaman album" card */
+	const copy = $derived(
+		data.copy as {
+			othersHeading: string;
+			button: { label: string; href: string };
+			playLabel: string;
+		}
+	);
 	const cover = $derived(album.cover ? data.media[album.cover] : undefined);
 	const entries = $derived(
 		album.items.map((it) => ({ ...it, m: data.media[it.media] })).filter((e) => e.m !== undefined)
@@ -46,17 +56,12 @@
 	<header
 		class="relative isolate flex min-h-[70svh] items-end overflow-hidden bg-forest text-cream"
 	>
-		{#if cover?.src}
-			<img
-				src={cover.src}
-				srcset={cover.srcset ?? undefined}
-				sizes="100vw"
-				alt=""
-				class="absolute inset-0 -z-10 size-full object-cover opacity-80"
-				style:object-position="{cover.focalX * 100}% {cover.focalY * 100}%"
-				fetchpriority="high"
-			/>
-		{/if}
+		<CoverImage
+			media={cover}
+			sizes="100vw"
+			priority
+			class="absolute inset-0 -z-10 size-full object-cover opacity-80"
+		/>
 		<div
 			class="absolute inset-0 -z-10 bg-linear-to-t from-forest/85 via-forest/30 to-transparent"
 		></div>
@@ -127,15 +132,21 @@
 								{:else}
 									<button
 										type="button"
-										class="flex size-full flex-col items-center justify-center gap-3 text-forest"
+										class="relative isolate flex size-full flex-col items-center justify-center gap-3 overflow-hidden text-forest"
 										onclick={() => (loaded[e.media] = true)}
 									>
+										<!-- The provider's still behind the play button (YouTube only) -->
+										<CoverImage
+											media={e.m}
+											sizes="(min-width: 48rem) 33vw, 50vw"
+											class="absolute inset-0 -z-10 size-full object-cover"
+										/>
 										<span
 											class="flex size-14 items-center justify-center rounded-full bg-forest text-cream"
 											><Play size={22} aria-hidden="true" /></span
 										>
-										<span class="text-small font-semibold"
-											>Putar dari {PROVIDER_LABELS[e.m.embedProvider!]}</span
+										<span class="rounded-chip bg-cream/90 px-3 py-1 text-small font-semibold"
+											>{copy.playLabel} {PROVIDER_LABELS[e.m.embedProvider!]}</span
 										>
 									</button>
 								{/if}
@@ -151,29 +162,27 @@
 	{#if data.others.length}
 		<section aria-labelledby="lainnya" class="border-t border-sage section-pad">
 			<div class="mx-auto flex max-w-6xl flex-col gap-6 px-5 lg:px-10">
-				<h2 id="lainnya" class="font-display text-h2">Album lainnya</h2>
+				<h2 id="lainnya" class="font-display text-h2">{copy.othersHeading}</h2>
 				<ul class="grid gap-5 sm:grid-cols-3">
 					{#each data.others as o (o.id)}
 						{@const c = o.cover ? data.media[o.cover] : undefined}
 						<li>
 							<a href={resolve('/(site)/portofolio/[slug]', { slug: o.slug })} class="group block">
 								<span class="block aspect-4/5 overflow-hidden bg-sage-20">
-									{#if c?.thumb}
-										<img
-											src={c.thumb}
-											alt=""
-											loading="lazy"
-											class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-											style:object-position="{c.focalX * 100}% {c.focalY * 100}%"
-										/>
-									{/if}
+									<CoverImage
+										media={c}
+										sizes="(min-width: 40rem) 30vw, 90vw"
+										class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
+									/>
 								</span>
 								<span class="mt-3 block font-display text-[1.375rem] italic">{o.title}</span>
 							</a>
 						</li>
 					{/each}
 				</ul>
-				<a href={resolve('booking')} class="site-btn w-fit">Ceritakan hari bahagiamu</a>
+				{#if copy.button.label && copy.button.href}
+					<CmsLink href={copy.button.href} class="site-btn w-fit">{copy.button.label}</CmsLink>
+				{/if}
 			</div>
 		</section>
 	{/if}
