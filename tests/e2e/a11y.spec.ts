@@ -20,6 +20,7 @@ const ADMIN = [
 	'/admin/booking',
 	'/admin/booking/daftar',
 	'/admin/klien',
+	'/admin/kru',
 	'/admin/kalender',
 	'/admin/keuangan/invoice',
 	'/admin/keuangan/pembayaran',

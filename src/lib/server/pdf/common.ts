@@ -175,3 +175,14 @@ export function pdfFileName(number: string): string {
 export function render(doc: TDocumentDefinitions): Promise<Buffer> {
 	return pdfmake.createPdf(doc).getBuffer();
 }
+
+/** A bill line: the description, and what it includes as a small list under it */
+export function itemCell(it: { description: string; details?: string[] }): Content {
+	if (!it.details?.length) return { text: it.description };
+	return {
+		stack: [
+			{ text: it.description },
+			{ ul: it.details, fontSize: 8.5, color: C.ink2, margin: [0, 3, 0, 0] }
+		]
+	};
+}

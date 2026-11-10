@@ -6,7 +6,7 @@ import { dateID, rupiah } from '../../format.ts';
 import { terbilangRupiah } from '../../terbilang.ts';
 import type { AppSettings } from '../services/app-settings.ts';
 import type { ReceiptDetail } from '../services/payments.ts';
-import { C, bandHeader, baseDocument, compact, label, render } from './common.ts';
+import { C, bandHeader, baseDocument, compact, itemCell, label, render } from './common.ts';
 
 const row = (name: string, value: Content): TableCell[] => [
 	{ text: name, color: C.ink2, margin: [0, 5, 0, 5] },
@@ -49,6 +49,22 @@ export function receiptDocument(p: ReceiptDetail, s: AppSettings): TDocumentDefi
 						p.note && { text: p.note, color: C.ink2 }
 					])
 				}),
+				...(p.items.length
+					? [
+							row('Rincian', {
+								table: {
+									widths: ['*', 80],
+									body: p.items.map((it) => [
+										itemCell(
+											it.qty > 1 ? { ...it, description: `${it.description} × ${it.qty}` } : it
+										),
+										{ text: rupiah(it.qty * it.unitPrice), alignment: 'right' }
+									])
+								},
+								layout: 'noBorders'
+							})
+						]
+					: []),
 				row('Metode', { text: PAYMENT_METHOD_LABEL[p.method] }),
 				row('Tanggal bayar', { text: dateID(p.paidOn, 'full') })
 			]

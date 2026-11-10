@@ -3,7 +3,11 @@
 		packages: { id: string; name: string; price: number; visible: boolean; category: string }[];
 		addons: { id: string; name: string; price: number }[];
 		clients: { id: string; name: string; phone: string | null }[];
+		crew: { id: string; name: string; role: string; active: boolean }[];
 	};
+
+	/** One event is handled by 1 or 2 crew (services/crew.ts MAX_CREW_PER_BOOKING) */
+	const MAX_CREW = 2;
 </script>
 
 <script lang="ts">
@@ -79,6 +83,9 @@
 	let addons = $state<AddonRow[]>([]);
 	let agreedPrice = $state<number | null>(0);
 	let notes = $state('');
+	let crewIds = $state<string[]>([]);
+	/** Crew already on the saved booking: shown even when deactivated since */
+	let savedCrew = $state<string[]>([]);
 	/** Package of the saved booking and its snapshot price (site price changes don't apply) */
 	let savedPackage = $state<{ id: string | null; price: number | null }>({ id: null, price: null });
 	let sameDate = $state<Record<string, { id: string; title: string }[]>>({});
@@ -103,6 +110,8 @@
 		addons = [];
 		agreedPrice = 0;
 		notes = '';
+		crewIds = [];
+		savedCrew = [];
 		savedPackage = { id: null, price: null };
 		sameDate = {};
 	}
@@ -133,6 +142,8 @@
 			addons = b.addons.map((a: AddonRow) => ({ ...a, key: ++rowKey }));
 			agreedPrice = b.agreedPrice;
 			notes = b.notes ?? '';
+			crewIds = b.crewIds ?? [];
+			savedCrew = [...crewIds];
 		} catch {
 			toast.error('Booking tidak bisa dimuat.');
 			open = false;
@@ -215,6 +226,12 @@
 		}, 300);
 	});
 
+	// ---------- crew (0–2) ----------
+	const crewChoices = $derived(options.crew.filter((c) => c.active || savedCrew.includes(c.id)));
+	function toggleCrew(id: string, on: boolean) {
+		crewIds = on ? [...crewIds, id].slice(0, MAX_CREW) : crewIds.filter((x) => x !== id);
+	}
+
 	const sessionsJson = $derived(
 		JSON.stringify(
 			sessions.map(({ eventType, date, startTime, endTime, venue, city }) => ({
@@ -274,6 +291,7 @@
 			{#if isEdit}<input type="hidden" name="id" value={bookingId} />{/if}
 			<input type="hidden" name="sessions" value={sessionsJson} />
 			<input type="hidden" name="addons" value={addonsJson} />
+			<input type="hidden" name="crewIds" value={JSON.stringify(crewIds)} />
 
 			<!-- Client -->
 			<fieldset class="flex flex-col gap-3">
@@ -500,6 +518,41 @@
 				>
 					<Plus size={14} aria-hidden="true" /> Tambah sesi
 				</button>
+			</fieldset>
+
+			<!-- Crew -->
+			<fieldset class="flex flex-col gap-2" aria-describedby="booking-crew-hint">
+				<legend class="mb-1 font-semibold">Kru</legend>
+				<p id="booking-crew-hint" class="text-small text-ink-2">
+					Maksimal {MAX_CREW} kru per acara.{#if crewIds.length}
+						Dipilih {crewIds.length}.{/if}
+				</p>
+				{#if errors.crewIds}<p class="field__error">{errors.crewIds}</p>{/if}
+				{#if crewChoices.length}
+					<div class="grid gap-1 sm:grid-cols-2">
+						{#each crewChoices as c (c.id)}
+							{@const on = crewIds.includes(c.id)}
+							<label class="flex min-h-10 items-center gap-3">
+								<input
+									type="checkbox"
+									class="checkbox"
+									checked={on}
+									disabled={!on && crewIds.length >= MAX_CREW}
+									onchange={(e) => toggleCrew(c.id, e.currentTarget.checked)}
+								/>
+								<span
+									>{c.name}{#if c.role}<span class="text-ink-2">
+											· {c.role}</span
+										>{/if}{#if !c.active}<span class="text-ink-2"> (nonaktif)</span>{/if}</span
+								>
+							</label>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-small text-ink-2">
+						Belum ada kru. Tambahkan di <a class="underline" href={resolve('admin/kru')}>Kru</a>.
+					</p>
+				{/if}
 			</fieldset>
 
 			<!-- Package + add-ons + price -->

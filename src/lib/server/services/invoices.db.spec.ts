@@ -6,7 +6,16 @@ import { describe, expect, it } from 'vitest';
 import { bookingSchema } from '../../schemas/crm';
 import { customInvoiceSchema } from '../../schemas/finance';
 import { createDb, type Tx } from '../db/client';
-import { booking, client, counter, invoice, payment } from '../db/schema/index';
+import {
+	addon,
+	booking,
+	client,
+	counter,
+	invoice,
+	packageCategory,
+	payment,
+	pkg
+} from '../db/schema/index';
 import { createBooking, moveBooking } from './bookings';
 import { ServiceError } from './errors';
 import { listSchedule } from './installments';
@@ -97,7 +106,8 @@ describe.runIf(isDevDb)('invoices', () => {
 				{
 					description: 'Jasa dokumentasi + add-on (E2E CRM Invoice), harga disepakati',
 					qty: 1,
-					unitPrice: 10_000_000
+					unitPrice: 10_000_000,
+					details: ['Add-on: Drone']
 				}
 			]);
 			await rejects(
@@ -126,6 +136,66 @@ describe.runIf(isDevDb)('invoices', () => {
 				'draft'
 			]);
 			expect(pelunasan.kind).toBe('pelunasan');
+		}));
+
+	it('lists what the package and each add-on include under their lines', () =>
+		inRollback(async (tx) => {
+			const [cat] = await tx
+				.insert(packageCategory)
+				.values({ name: 'Spec', position: 'a0' })
+				.returning();
+			const [gold] = await tx
+				.insert(pkg)
+				.values({
+					categoryId: cat.id,
+					name: 'Gold Spec',
+					price: 9_000_000,
+					inclusions: ['2 fotografer', ' ', 'Album 30 halaman'],
+					position: 'a0'
+				})
+				.returning();
+			const [drone] = await tx
+				.insert(addon)
+				.values({
+					name: 'Drone',
+					price: 1_000_000,
+					description: 'Foto udara 1 jam',
+					position: 'a0'
+				})
+				.returning();
+			const made = await createBooking(
+				tx,
+				bookingInput('0899-7006-0009', {
+					packageId: gold.id,
+					addons: JSON.stringify([
+						{ addonId: drone.id, name: 'Drone', unitPrice: 1_000_000, qty: 1 },
+						{ addonId: null, name: 'Cetak kanvas', unitPrice: 0, qty: 1 }
+					])
+				}),
+				null
+			);
+			const [dp] = await listSchedule(tx, made.id);
+			const inv = await createInstallmentInvoice(
+				tx,
+				{ installmentId: dp.id, issueDate: '2031-08-01', dueDate: '2031-08-08', notes: null },
+				null
+			);
+			expect(inv.items).toEqual([
+				{
+					description: 'Paket Gold Spec',
+					qty: 1,
+					unitPrice: 9_000_000,
+					details: ['2 fotografer', 'Album 30 halaman']
+				},
+				{
+					description: 'Add-on: Drone',
+					qty: 1,
+					unitPrice: 1_000_000,
+					details: ['Foto udara 1 jam']
+				},
+				// A line typed on the booking has no description
+				{ description: 'Add-on: Cetak kanvas', qty: 1, unitPrice: 0 }
+			]);
 		}));
 
 	it('refuses to void an invoice that has a payment', () =>

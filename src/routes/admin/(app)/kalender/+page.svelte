@@ -54,6 +54,26 @@
 		selected ? data.items.filter((i) => i.bookingId === selected!.bookingId) : []
 	);
 
+	/**
+	 * Fill = booked (DP paid), dashed outline = tentative. Colour by crew: 1 = emerald, 2 = burgundy;
+	 * no crew keeps forest / olive.
+	 */
+	function tone(it: Item) {
+		const n = it.crewCount;
+		if (it.booked)
+			return n === 1
+				? 'border-crew-1 bg-crew-1 text-surface'
+				: n >= 2
+					? 'border-crew-2 bg-crew-2 text-surface'
+					: 'border-forest bg-forest text-surface';
+		return n === 1
+			? 'border-2 border-dashed border-crew-1 bg-surface'
+			: n >= 2
+				? 'border-2 border-dashed border-crew-2 bg-surface'
+				: 'border-dashed border-olive bg-surface';
+	}
+	const crewText = (it: Item) => (it.crewCount ? `${it.crewCount} kru` : 'belum ada kru');
+
 	const time = (it: Item) =>
 		it.startTime && it.endTime ? `${it.startTime}–${it.endTime}` : (it.startTime ?? null);
 </script>
@@ -63,15 +83,22 @@
 		type="button"
 		class={[
 			'w-full rounded-chip border px-1.5 py-0.5 text-left text-[11px] leading-snug font-semibold',
-			it.booked ? 'border-forest bg-forest text-surface' : 'border-dashed border-olive bg-surface',
+			tone(it),
 			full && 'px-3 py-2 text-small'
 		]}
 		data-status={it.booked ? 'booked' : 'tentative'}
-		title={`${chipText(it)}${it.booked ? '' : ' (tentatif, belum DP)'}`}
+		data-crew={it.crewCount}
+		title={`${chipText(it)} · ${crewText(it)}${it.booked ? '' : ' (tentatif, belum DP)'}`}
 		onclick={() => show(it)}
 	>
-		<span class={full ? undefined : 'line-clamp-2'}>{chipText(it)}</span>
-		<span class="sr-only">{it.booked ? ', booked' : ', tentatif'}</span>
+		<span class="flex items-start justify-between gap-1">
+			<span class={full ? undefined : 'line-clamp-2'}>{chipText(it)}</span>
+			{#if it.crewCount}
+				<!-- Visible count: emerald and burgundy look alike to some people -->
+				<span class="shrink-0 tabular-nums opacity-90" aria-hidden="true">{it.crewCount}×</span>
+			{/if}
+		</span>
+		<span class="sr-only">{it.booked ? ', booked' : ', tentatif'}, {crewText(it)}</span>
 	</button>
 {/snippet}
 
@@ -91,7 +118,7 @@
 <div class="page-body">
 	<PageHeader
 		title="Kalender"
-		description="Sesi booking per tanggal. Penuh = Booked (DP lunas), garis putus = tentatif."
+		description="Sesi booking per tanggal. Penuh = Booked (DP lunas), garis putus = tentatif. Warna = jumlah kru."
 	/>
 
 	<div class="flex flex-wrap items-center justify-between gap-3">
@@ -206,14 +233,21 @@
 
 	<ul class="flex flex-wrap gap-4 text-small text-ink-2" aria-label="Keterangan">
 		<li class="inline-flex items-center gap-1.5">
-			<span class="inline-block h-3 w-5 rounded-chip bg-forest" aria-hidden="true"></span> Booked (DP
-			lunas)
+			<span class="inline-block h-3 w-5 rounded-chip bg-forest" aria-hidden="true"></span> Warna penuh:
+			Booked (DP lunas)
 		</li>
 		<li class="inline-flex items-center gap-1.5">
 			<span
 				class="inline-block h-3 w-5 rounded-chip border border-dashed border-olive"
 				aria-hidden="true"
-			></span> Tentatif (belum DP)
+			></span> Garis putus: Tentatif (belum DP)
+		</li>
+		<li class="inline-flex items-center gap-1.5">
+			<span class="inline-block h-3 w-5 rounded-chip bg-crew-1" aria-hidden="true"></span> Hijau: 1 kru
+		</li>
+		<li class="inline-flex items-center gap-1.5">
+			<span class="inline-block h-3 w-5 rounded-chip bg-crew-2" aria-hidden="true"></span> Merah marun:
+			2 kru
 		</li>
 		<li class="inline-flex items-center gap-1.5">
 			<TriangleAlert size={14} class="text-warning" aria-hidden="true" /> 2+ booking di tanggal yang sama
@@ -260,6 +294,12 @@
 					{/each}
 				</ul>
 			</section>
+			<p class="flex justify-between gap-3 text-body">
+				<span>Kru</span>
+				<span class="text-right font-semibold"
+					>{selected.crew.length ? selected.crew.join(', ') : 'Belum ada kru'}</span
+				>
+			</p>
 			<p class="flex justify-between gap-3 text-body">
 				<span>Harga disepakati</span>
 				<span class="font-semibold tabular-nums">{rupiah(selected.agreedPrice)}</span>

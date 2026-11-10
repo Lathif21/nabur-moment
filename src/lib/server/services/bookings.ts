@@ -23,6 +23,7 @@ import type {
 	DeliveryInput
 } from '../../schemas/crm.ts';
 import { findClientByPhone } from './clients.ts';
+import { crewByBooking, crewOptions, setBookingCrew } from './crew.ts';
 import { ServiceError } from './errors.ts';
 import { ensureSchedule } from './installments.ts';
 import { voidUnpaidInvoices } from './invoices.ts';
@@ -98,7 +99,7 @@ const nextDateSql = (today: string) =>
 
 /** Every booking for the board, in card order per column */
 export async function listBoard(db: DbOrTx, today = dayKeyWib()) {
-	return db
+	const cards = await db
 		.select({
 			id: booking.id,
 			title: booking.title,
@@ -115,6 +116,11 @@ export async function listBoard(db: DbOrTx, today = dayKeyWib()) {
 		.from(booking)
 		.innerJoin(client, eq(client.id, booking.clientId))
 		.orderBy(asc(booking.position), asc(booking.createdAt));
+	const crew = await crewByBooking(
+		db,
+		cards.map((c) => c.id)
+	);
+	return cards.map((c) => ({ ...c, crew: crew[c.id] ?? [] }));
 }
 
 export type BoardCard = Awaited<ReturnType<typeof listBoard>>[number];
@@ -204,7 +210,7 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 		.innerJoin(client, eq(client.id, booking.clientId))
 		.where(eq(booking.id, id));
 	if (!row) return null;
-	const [sessions, addons] = await Promise.all([
+	const [sessions, addons, crew] = await Promise.all([
 		db
 			.select({
 				eventType: bookingSession.eventType,
@@ -227,9 +233,10 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 			})
 			.from(bookingAddon)
 			.where(eq(bookingAddon.bookingId, id))
-			.orderBy(asc(bookingAddon.createdAt))
+			.orderBy(asc(bookingAddon.createdAt)),
+		crewByBooking(db, [id])
 	]);
-	return { ...row, sessions, addons };
+	return { ...row, sessions, addons, crewIds: (crew[id] ?? []).map((c) => c.id) };
 }
 
 export type BookingForEdit = NonNullable<Awaited<ReturnType<typeof getBookingForEdit>>>;
@@ -267,7 +274,7 @@ export async function getBookingDetail(db: DbOrTx, id: string) {
 		.innerJoin(client, eq(client.id, booking.clientId))
 		.where(eq(booking.id, id));
 	if (!row) return null;
-	const [sessions, addons] = await Promise.all([
+	const [sessions, addons, crew] = await Promise.all([
 		db
 			.select({
 				id: bookingSession.id,
@@ -291,16 +298,17 @@ export async function getBookingDetail(db: DbOrTx, id: string) {
 			})
 			.from(bookingAddon)
 			.where(eq(bookingAddon.bookingId, id))
-			.orderBy(asc(bookingAddon.createdAt))
+			.orderBy(asc(bookingAddon.createdAt)),
+		crewByBooking(db, [id])
 	]);
-	return { ...row, sessions, addons };
+	return { ...row, sessions, addons, crew: crew[id] ?? [] };
 }
 
 export type BookingDetail = NonNullable<Awaited<ReturnType<typeof getBookingDetail>>>;
 
 /** Packages (visible or not: hidden ones stay selectable) and active add-ons for the form */
 export async function bookingFormOptions(db: DbOrTx) {
-	const [packages, addons, clients] = await Promise.all([
+	const [packages, addons, clients, crew] = await Promise.all([
 		db
 			.select({
 				id: pkg.id,
@@ -322,9 +330,10 @@ export async function bookingFormOptions(db: DbOrTx) {
 			.from(client)
 			.where(isNull(client.archivedAt))
 			.orderBy(asc(client.name))
-			.limit(2000)
+			.limit(2000),
+		crewOptions(db)
 	]);
-	return { packages, addons, clients };
+	return { packages, addons, clients, crew };
 }
 
 // ---------- writes ----------
@@ -481,6 +490,7 @@ export async function createBooking(db: DbOrTx, input: BookingInput, userId: str
 			})
 			.returning({ id: booking.id });
 		await writeLines(tx, row.id, input);
+		await setBookingCrew(tx, row.id, input.crewIds);
 		await ensureSchedule(tx, row.id);
 		await tx.insert(activity).values({
 			clientId,
@@ -495,8 +505,8 @@ export async function createBooking(db: DbOrTx, input: BookingInput, userId: str
 }
 
 /**
- * Edit everything except the stage (moves go through moveBooking). Sessions and add-on lines are
- * replaced. The package snapshot is kept unless another package is picked.
+ * Edit everything except the stage (moves go through moveBooking). Sessions, add-on lines and
+ * crew are replaced. The package snapshot is kept unless another package is picked.
  */
 export async function updateBooking(
 	db: DbOrTx,
@@ -534,6 +544,7 @@ export async function updateBooking(
 		await tx.delete(bookingSession).where(eq(bookingSession.bookingId, id));
 		await tx.delete(bookingAddon).where(eq(bookingAddon.bookingId, id));
 		await writeLines(tx, id, input);
+		await setBookingCrew(tx, id, input.crewIds);
 		// price, add-ons or sessions may have changed: DP / pelunasan amounts and due date
 		await ensureSchedule(tx, id);
 		return { id, clientId };

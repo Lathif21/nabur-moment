@@ -21,6 +21,7 @@ export const MODULES = [
 	{ key: 'calendar', label: 'Kalender', group: 'CRM', actions: READ_ONLY },
 	{ key: 'clients', label: 'Klien', group: 'CRM', actions: ALL },
 	{ key: 'bookings', label: 'Booking', group: 'CRM', actions: ALL },
+	{ key: 'crew', label: 'Kru', group: 'CRM', actions: ALL },
 	{ key: 'invoices', label: 'Invoice', group: 'Keuangan', actions: ALL },
 	{ key: 'payments', label: 'Pembayaran', group: 'Keuangan', actions: ALL },
 	{ key: 'expenses', label: 'Pengeluaran', group: 'Keuangan', actions: ALL },

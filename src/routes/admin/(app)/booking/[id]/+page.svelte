@@ -241,6 +241,29 @@
 				{/if}
 			</section>
 
+			<section class="flex flex-col gap-3" aria-labelledby="crew-title">
+				<h2 id="crew-title" class="font-display text-section-title">Kru</h2>
+				{#if b.crew.length === 0}
+					<p class="card px-4 py-3 text-body text-ink-2">
+						Belum ada kru.{#if data.allow.update}
+							Pilih lewat Ubah booking.{/if}
+					</p>
+				{:else}
+					<ul class="card divide-y divide-line">
+						{#each b.crew as k (k.id)}
+							<li class="px-4 py-3">
+								{#if data.allow.crew}
+									<a
+										class="font-semibold underline-offset-2 hover:underline"
+										href={resolve('/admin/(app)/kru/[id]', { id: k.id })}>{k.name}</a
+									>
+								{:else}<span class="font-semibold">{k.name}</span>{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
+
 			<section class="flex flex-col gap-3" aria-labelledby="package-title">
 				<h2 id="package-title" class="font-display text-section-title">Paket & add-on</h2>
 				<div class="card flex flex-col gap-3 px-4 py-3">

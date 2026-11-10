@@ -5,6 +5,7 @@ import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from 'drizz
 import type { DbOrTx } from '../db/client.ts';
 import {
 	activity,
+	addon,
 	booking,
 	bookingAddon,
 	bookingInstallment,
@@ -70,24 +71,43 @@ async function bookingForInvoice(tx: DbOrTx, bookingId: string) {
  */
 async function contractItems(
 	tx: DbOrTx,
-	b: Awaited<ReturnType<typeof bookingForInvoice>>
+	b: Pick<
+		Awaited<ReturnType<typeof bookingForInvoice>>,
+		'id' | 'title' | 'agreedPrice' | 'packageSnapshot'
+	>
 ): Promise<InvoiceItem[]> {
 	const addons = await tx
-		.select({ name: bookingAddon.name, unitPrice: bookingAddon.unitPrice, qty: bookingAddon.qty })
+		.select({
+			name: bookingAddon.name,
+			unitPrice: bookingAddon.unitPrice,
+			qty: bookingAddon.qty,
+			// The add-on list's description (none for a line typed on the booking)
+			description: addon.description
+		})
 		.from(bookingAddon)
+		.leftJoin(addon, eq(addon.id, bookingAddon.addonId))
 		.where(eq(bookingAddon.bookingId, b.id))
 		.orderBy(asc(bookingAddon.createdAt));
+	// What the package includes, as stored on the booking when it was picked
+	const inclusions = (b.packageSnapshot?.inclusions ?? []).map((s) => s.trim()).filter(Boolean);
+	const withDetails = (details: string[]) => (details.length ? { details } : {});
 	const lines: InvoiceItem[] = [
 		...(b.packageSnapshot
 			? [
 					{
 						description: `Paket ${b.packageSnapshot.name}`,
 						qty: 1,
-						unitPrice: b.packageSnapshot.price
+						unitPrice: b.packageSnapshot.price,
+						...withDetails(inclusions)
 					}
 				]
 			: []),
-		...addons.map((a) => ({ description: `Add-on: ${a.name}`, qty: a.qty, unitPrice: a.unitPrice }))
+		...addons.map((a) => ({
+			description: `Add-on: ${a.name}`,
+			qty: a.qty,
+			unitPrice: a.unitPrice,
+			...withDetails(a.description?.trim() ? [a.description.trim()] : [])
+		}))
 	];
 	if (lines.length && itemsTotal(lines) === b.agreedPrice) return lines;
 	const label = b.packageSnapshot ? `Paket ${b.packageSnapshot.name}` : 'Jasa dokumentasi';
@@ -95,9 +115,25 @@ async function contractItems(
 		{
 			description: `${label}${addons.length ? ' + add-on' : ''} (${b.title}), harga disepakati`,
 			qty: 1,
-			unitPrice: b.agreedPrice
+			unitPrice: b.agreedPrice,
+			// Prices no longer add up, but the client still sees what the deal covers
+			...withDetails([...inclusions, ...addons.map((a) => `Add-on: ${a.name}`)])
 		}
 	];
+}
+
+/** The contract lines of a booking as they would be billed now (kwitansi without an invoice) */
+export async function bookingContractLines(db: DbOrTx, bookingId: string) {
+	const [b] = await db
+		.select({
+			id: booking.id,
+			title: booking.title,
+			agreedPrice: booking.agreedPrice,
+			packageSnapshot: booking.packageSnapshot
+		})
+		.from(booking)
+		.where(eq(booking.id, bookingId));
+	return b ? contractItems(db, b) : [];
 }
 
 async function logInvoice(

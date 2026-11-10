@@ -6,7 +6,16 @@ import { dateID, phoneDisplay, rupiah } from '../../format.ts';
 import { terbilangRupiah } from '../../terbilang.ts';
 import { bankReady, type AppSettings } from '../services/app-settings.ts';
 import type { InvoiceDetail } from '../services/invoices.ts';
-import { C, bandHeader, baseDocument, compact, label, render, tableLayout } from './common.ts';
+import {
+	C,
+	bandHeader,
+	baseDocument,
+	compact,
+	itemCell,
+	label,
+	render,
+	tableLayout
+} from './common.ts';
 
 const WATERMARK: Partial<Record<InvoiceDetail['status'], { text: string; color: string }>> = {
 	draft: { text: 'DRAF', color: C.olive },
@@ -95,7 +104,7 @@ export function invoiceDocument(inv: InvoiceDetail, s: AppSettings): TDocumentDe
 					head('Subtotal', 'right')
 				],
 				...inv.items.map((it) => [
-					{ text: it.description },
+					itemCell(it),
 					right(String(it.qty)),
 					right(rupiah(it.unitPrice)),
 					right(rupiah(it.qty * it.unitPrice))

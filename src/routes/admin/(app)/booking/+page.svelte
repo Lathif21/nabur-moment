@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
+	import Camera from '@lucide/svelte/icons/camera';
 	import List from '@lucide/svelte/icons/list';
 	import Plus from '@lucide/svelte/icons/plus';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
@@ -100,6 +101,18 @@
 					<p class="text-small text-ink-2">Tanggal belum ditentukan</p>
 				{/if}
 				{#if c.packageName}<p class="truncate text-small text-ink-2">{c.packageName}</p>{/if}
+				<p class="flex items-start gap-1.5 text-small">
+					<Camera size={14} class="mt-0.5 shrink-0 text-ink-2" aria-hidden="true" />
+					{#if c.crew.length}
+						<span
+							><span class="font-semibold">{c.crew.length} kru</span> · {c.crew
+								.map((k) => k.name)
+								.join(', ')}</span
+						>
+					{:else}
+						<span class="text-ink-2">Belum ada kru</span>
+					{/if}
+				</p>
 				<div class="mt-1 flex items-center gap-2">
 					<span class="font-semibold tabular-nums">{rupiahShort(c.agreedPrice)}</span>
 					{#if c.stage !== 'lost'}

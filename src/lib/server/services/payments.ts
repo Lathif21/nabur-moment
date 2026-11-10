@@ -18,7 +18,7 @@ import { INSTALLMENT_LABEL, PAYMENT_METHOD_LABEL, type InvoiceStatus } from '../
 import { dayKeyWib, rupiah } from '../../format.ts';
 import type { PaymentFilter, PaymentInput } from '../../schemas/finance.ts';
 import { ServiceError } from './errors.ts';
-import { nextNumber } from './invoices.ts';
+import { bookingContractLines, nextNumber } from './invoices.ts';
 import { PRIVATE_BUCKET } from '../storage/files.ts';
 
 const sumAmount = sql<number>`coalesce(sum(${payment.amount}), 0)::bigint`.mapWith(Number);
@@ -382,6 +382,7 @@ export async function getPaymentForReceipt(db: DbOrTx, id: string) {
 			method: payment.method,
 			note: payment.note,
 			invoiceNumber: invoice.number,
+			invoiceItems: invoice.items,
 			installmentKind: bookingInstallment.kind,
 			booking: { id: booking.id, title: booking.title, agreedPrice: booking.agreedPrice },
 			client: { name: client.name, phone: client.phone, city: client.city }
@@ -406,7 +407,9 @@ export async function getPaymentForReceipt(db: DbOrTx, id: string) {
 				sql`(${payment.paidOn}, ${payment.createdAt}) <= (select p.paid_on, p.created_at from "payment" p where p.id = ${id})`
 			)
 		);
-	return { ...row, paidSoFar };
+	// "Rincian": the paid invoice's lines, else the booking's package + add-ons
+	const items = row.invoiceItems ?? (await bookingContractLines(db, row.booking.id));
+	return { ...row, items, paidSoFar };
 }
 
 export type ReceiptDetail = NonNullable<Awaited<ReturnType<typeof getPaymentForReceipt>>>;

@@ -191,7 +191,9 @@ export const bookingSchema = z
 			(s) => s.length >= 1,
 			'Tambahkan minimal satu sesi.'
 		),
-		addons: jsonArray(addonLineSchema)
+		addons: jsonArray(addonLineSchema),
+		/** 0–2 crew (services/crew.ts MAX_CREW_PER_BOOKING) */
+		crewIds: jsonArray(z.uuid()).refine((ids) => ids.length <= 2, 'Maksimal 2 kru per booking.')
 	})
 	.superRefine((v, ctx) => {
 		if (!v.clientId && !v.newClientName)
@@ -268,3 +270,38 @@ export const deliverySchema = z.object({
 });
 
 export type DeliveryInput = z.output<typeof deliverySchema>;
+
+/** Optional WhatsApp, stored as 628… */
+const optionalPhone = z
+	.string()
+	.trim()
+	.max(30)
+	.default('')
+	.transform((v, ctx) => {
+		if (!v) return null;
+		const n = phoneNormalize(v);
+		if (!n) {
+			ctx.addIssue({ code: 'custom', message: 'Nomor WhatsApp tidak valid.' });
+			return z.NEVER;
+		}
+		return n;
+	});
+
+/** Kru: an asset (no login), assigned to bookings */
+export const crewSchema = z.object({
+	id: z
+		.string()
+		.default('')
+		.transform((v) => v || null)
+		.pipe(z.uuid().nullable()),
+	name: z.string().trim().min(1, 'Nama wajib diisi.').max(120),
+	role: z.string().trim().max(60).default(''),
+	phone: optionalPhone,
+	// Checkbox: present = on
+	active: z
+		.string()
+		.optional()
+		.transform((v) => v === 'on' || v === 'true')
+});
+
+export type CrewFormInput = z.output<typeof crewSchema>;

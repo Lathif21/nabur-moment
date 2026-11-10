@@ -1,7 +1,7 @@
 // Kalender (P2-05, 01-PRD "Calendar", 03-SCREENS B3): booking sessions by session date.
-// Booked (DP paid) vs tentative (dated, no DP yet); Batal never shows. A day with sessions of 2+
+// Booked (DP paid) vs tentative (dated, no DP yet), coloured by crew count; Batal never shows. A day with sessions of 2+
 // bookings gets a warning (allowed, never blocked). Takes `db` or an open transaction first.
-import { and, asc, between, eq, ne } from 'drizzle-orm';
+import { and, asc, between, eq, ne, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
 import { booking, bookingSession, client } from '../db/schema/index.ts';
 import type { EventType } from '../../crm.ts';
@@ -31,7 +31,11 @@ export async function listCalendar(db: DbOrTx, filter: CalendarFilter) {
 			stage: booking.stage,
 			bookedAt: booking.bookedAt,
 			agreedPrice: booking.agreedPrice,
-			clientName: client.name
+			clientName: client.name,
+			/** Crew names; the count (0–2) colours the chip: 1 = emerald, 2 = burgundy */
+			crew: sql<
+				string[]
+			>`(select coalesce(array_agg(c.name order by c.name), '{}') from "booking_crew" bc join "crew" c on c.id = bc.crew_id where bc.booking_id = "booking"."id")`
 		})
 		.from(bookingSession)
 		.innerJoin(booking, eq(booking.id, bookingSession.bookingId))
@@ -44,7 +48,12 @@ export async function listCalendar(db: DbOrTx, filter: CalendarFilter) {
 			asc(bookingSession.sort)
 		);
 
-	const all = rows.map((r) => ({ ...r, date: r.date!, booked: r.bookedAt !== null }));
+	const all = rows.map((r) => ({
+		...r,
+		date: r.date!,
+		booked: r.bookedAt !== null,
+		crewCount: r.crew.length
+	}));
 
 	// Warnings count every non-Batal booking on the day, whatever the filters hide
 	const perDay = new Map<string, Set<string>>();

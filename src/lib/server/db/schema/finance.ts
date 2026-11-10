@@ -84,7 +84,13 @@ export const counter = pgTable('counter', {
 });
 
 /** One invoice line; amounts in whole Rupiah, no discount lines */
-export type InvoiceItem = { description: string; qty: number; unitPrice: number };
+export type InvoiceItem = {
+	description: string;
+	qty: number;
+	unitPrice: number;
+	/** What the line includes, printed under it: the package contents, an add-on's description */
+	details?: string[];
+};
 
 /**
  * A numbered bill (INV/NM/{YYYY}/{MM}/{NNN}), never deleted: voided. For an installment invoice

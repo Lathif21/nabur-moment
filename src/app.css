@@ -35,6 +35,11 @@
 	--color-danger: #a3352c;
 	--color-danger-bg: #f8e1dd;
 
+	/* Kalender: crew per booking (client feedback). White text on both: emerald 6.3:1, burgundy
+	   9.7:1. Red/green look alike to some people, so calendar chips also show the count. */
+	--color-crew-1: #0b6e4f;
+	--color-crew-2: #7b2340;
+
 	/* Type */
 	--font-sans: 'Open Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-display: 'Playfair Display', ui-serif, Georgia, serif;

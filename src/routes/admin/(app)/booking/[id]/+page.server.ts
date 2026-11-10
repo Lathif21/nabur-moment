@@ -33,6 +33,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const allow = {
 		update: can(perms, 'bookings', 'update'),
 		newClient: can(perms, 'clients', 'create'),
+		crew: can(perms, 'crew', 'read'),
 		payments: can(perms, 'payments', 'create'),
 		deletePayments: can(perms, 'payments', 'delete'),
 		expenses: {

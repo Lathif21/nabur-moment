@@ -6,6 +6,7 @@ import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import SquareKanban from '@lucide/svelte/icons/square-kanban';
 import Users from '@lucide/svelte/icons/users';
+import Camera from '@lucide/svelte/icons/camera';
 import FileText from '@lucide/svelte/icons/file-text';
 import Banknote from '@lucide/svelte/icons/banknote';
 import Receipt from '@lucide/svelte/icons/receipt';
@@ -61,7 +62,8 @@ export const adminNav: AdminNavGroup[] = [
 			{ label: 'Dashboard', href: 'admin', icon: LayoutDashboard, module: 'dashboard' },
 			{ label: 'Kalender', href: 'admin/kalender', icon: CalendarDays, module: 'calendar' },
 			{ label: 'Booking', href: 'admin/booking', icon: SquareKanban, module: 'bookings' },
-			{ label: 'Klien', href: 'admin/klien', icon: Users, module: 'clients' }
+			{ label: 'Klien', href: 'admin/klien', icon: Users, module: 'clients' },
+			{ label: 'Kru', href: 'admin/kru', icon: Camera, module: 'crew' }
 		]
 	},
 	{

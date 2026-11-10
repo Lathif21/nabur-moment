@@ -29,8 +29,13 @@ const inv: InvoiceDetail = {
 	issueDate: '2026-11-08',
 	dueDate: '2026-11-15',
 	items: [
-		{ description: 'Paket Gold', qty: 1, unitPrice: 9_000_000 },
-		{ description: 'Add-on: Drone', qty: 1, unitPrice: 1_000_000 }
+		{
+			description: 'Paket Gold',
+			qty: 1,
+			unitPrice: 9_000_000,
+			details: ['2 fotografer', 'Album 30 halaman']
+		},
+		{ description: 'Add-on: Drone', qty: 1, unitPrice: 1_000_000, details: ['Foto udara 1 jam'] }
 	],
 	total: 5_000_000,
 	notes: 'Terima kasih.',
@@ -53,9 +58,11 @@ const receipt: ReceiptDetail = {
 	method: 'transfer',
 	note: null,
 	invoiceNumber: 'INV/NM/2026/11/007',
+	invoiceItems: inv.items,
 	installmentKind: 'dp',
 	booking: { id: 'b', title: 'Wedding Nadia & Raka', agreedPrice: 10_000_000 },
 	client: { name: 'Nadia Putri', phone: '6281111111111', city: 'Bandung' },
+	items: inv.items,
 	paidSoFar: 5_000_000
 };
 
@@ -77,6 +84,10 @@ describe('invoice PDF', () => {
 		expect(all).toContain('NABUR');
 		expect(all).toContain('INV/NM/2026/11/007');
 		expect(all).toContain('Paket Gold');
+		// What the package and add-on include, under their lines
+		expect(all).toContain('2 fotografer');
+		expect(all).toContain('Album 30 halaman');
+		expect(all).toContain('Foto udara 1 jam');
 		expect(all).toContain('Ditagih: DP 50%');
 		expect(all).toMatch(/Rp\s?5\.000\.000/);
 		expect(all).toContain('Lima juta rupiah');
@@ -112,6 +123,11 @@ describe('kwitansi PDF', () => {
 		expect(all).toContain('Lima juta rupiah');
 		expect(all).toContain('DP 50% · Wedding Nadia & Raka');
 		expect(all).toContain('Invoice INV/NM/2026/11/007');
+		// Rincian: the lines paid for, with what they include
+		expect(all).toContain('Rincian');
+		expect(all).toContain('Paket Gold');
+		expect(all).toContain('2 fotografer');
+		expect(all).toMatch(/Rp\s?9\.000\.000/);
 		expect(all).toMatch(/Sisa Rp\s?5\.000\.000/);
 	});
 
