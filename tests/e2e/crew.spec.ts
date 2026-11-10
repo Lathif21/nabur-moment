@@ -74,6 +74,19 @@ test('add crew, assign two to a booking, see them on the card and the calendar',
 		await expect(page.getByRole('link', { name })).toBeVisible();
 	}
 
+	// Search filters as you type: by role, then by WhatsApp typed as 0812…
+	const search = page.getByRole('searchbox', { name: 'Cari kru' });
+	await search.fill(`videografer ${run}`);
+	await expect(page.getByRole('link', { name: names[2] })).toBeVisible();
+	await expect(page.getByRole('link', { name: names[0] })).toHaveCount(0);
+	await search.fill('0812 0000 1111');
+	await expect(page.getByRole('link', { name: names[0] })).toBeVisible();
+	await expect(page.getByRole('link', { name: names[1] })).toHaveCount(0);
+	await search.fill(`zzz ${run}`);
+	await expect(page.getByText('Tidak ada kru yang cocok dengan pencarian ini.')).toBeVisible();
+	await page.getByRole('button', { name: 'Hapus pencarian' }).click();
+	await expect(page.getByRole('link', { name: names[1] })).toBeVisible();
+
 	// 2. New booking with two crew: the third box is then disabled
 	await page.goto('/admin/booking');
 	await page.waitForLoadState('networkidle');

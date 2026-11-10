@@ -6,6 +6,7 @@
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Plus from '@lucide/svelte/icons/plus';
+	import Search from '@lucide/svelte/icons/search';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ConfirmDialog from '#lib/components/admin/ConfirmDialog.svelte';
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
@@ -13,7 +14,7 @@
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import PeriodFilter from '#lib/components/admin/PeriodFilter.svelte';
 	import Field from '#lib/components/form/Field.svelte';
-	import { waLink } from '#lib/crm.ts';
+	import { crewMatches, waLink } from '#lib/crm.ts';
 	import { phoneDisplay } from '#lib/format.ts';
 	import { toast } from '#lib/toast.ts';
 	import type { PageProps } from './$types';
@@ -27,6 +28,10 @@
 	let busy = $state(false);
 	let deleteFor = $state<Row | null>(null);
 	let deleteOpen = $state(false);
+
+	// The whole list is on the page: filter as you type, no reload
+	let q = $state('');
+	const shown = $derived(data.crew.filter((c) => crewMatches(c, q)));
 
 	const err = (k: string) => (errors[k] ? [errors[k]] : undefined);
 	const base = resolve('admin/kru');
@@ -68,79 +73,113 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<section class="card table-wrap" aria-label="Daftar kru">
-			<table class="table min-w-[40rem]">
-				<thead>
-					<tr>
-						<th scope="col">Nama</th>
-						<th scope="col">WhatsApp</th>
-						<th scope="col" class="text-right">Booking ({data.period.label})</th>
-						<th scope="col"><span class="sr-only">Aksi</span></th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.crew as c (c.id)}
-						<tr class={!c.active ? 'opacity-70' : undefined}>
-							<td>
-								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() + the current query, built in detailHref -->
-								<a class="font-semibold underline-offset-2 hover:underline" href={detailHref(c.id)}
-									>{c.name}</a
-								>
-								{#if !c.active}<span class="chip ml-1">Nonaktif</span>{/if}
-								{#if c.role}<span class="block text-small text-ink-2">{c.role}</span>{/if}
-							</td>
-							<td>
-								{#if c.phone}
-									<!-- eslint-disable svelte/no-navigation-without-resolve -- external wa.me chat link -->
-									<a
-										class="inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
-										href={waLink(c.phone)}
-										target="_blank"
-										rel="noopener noreferrer"
-									>
-										<MessageCircle size={14} aria-hidden="true" />
-										{phoneDisplay(c.phone)}
-									</a>
-									<!-- eslint-enable svelte/no-navigation-without-resolve -->
-								{:else}<span class="text-ink-2">–</span>{/if}
-							</td>
-							<td class="text-right tabular-nums">{c.bookings}</td>
-							<td>
-								<span class="flex justify-end gap-1">
-									{#if data.allow.update}
-										<button
-											type="button"
-											class="icon-btn"
-											aria-label="Ubah {c.name}"
-											onclick={() => openForm(c)}
-										>
-											<Pencil size={16} aria-hidden="true" />
-										</button>
-									{/if}
-									{#if data.allow.delete}
-										<button
-											type="button"
-											class="icon-btn"
-											aria-label="Hapus {c.name}"
-											disabled={c.assigned > 0}
-											title={c.assigned > 0
-												? 'Sudah tercatat di booking. Nonaktifkan saja.'
-												: undefined}
-											onclick={() => {
-												deleteFor = c;
-												deleteOpen = true;
-											}}
-										>
-											<Trash2 size={16} aria-hidden="true" />
-										</button>
-									{/if}
-								</span>
-							</td>
+		<div role="search" class="flex flex-wrap items-end gap-3">
+			<label class="field min-w-56 flex-1 sm:max-w-md">
+				<span>Cari kru</span>
+				<span class="relative block">
+					<Search
+						size={16}
+						class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-2"
+						aria-hidden="true"
+					/>
+					<input
+						type="search"
+						class="input pl-9"
+						placeholder="Nama, peran, 0812…"
+						autocomplete="off"
+						bind:value={q}
+					/>
+				</span>
+			</label>
+			<p class="pb-2 text-small text-ink-2" aria-live="polite">
+				{q.trim() ? `${shown.length} dari ${data.crew.length} kru` : `${data.crew.length} kru`}
+			</p>
+		</div>
+
+		{#if shown.length === 0}
+			<EmptyState icon={Search} message="Tidak ada kru yang cocok dengan pencarian ini.">
+				{#snippet action()}
+					<button type="button" class="btn btn--secondary" onclick={() => (q = '')}
+						>Hapus pencarian</button
+					>
+				{/snippet}
+			</EmptyState>
+		{:else}
+			<section class="card table-wrap" aria-label="Daftar kru">
+				<table class="table min-w-[40rem]">
+					<thead>
+						<tr>
+							<th scope="col">Nama</th>
+							<th scope="col">WhatsApp</th>
+							<th scope="col" class="text-right">Booking ({data.period.label})</th>
+							<th scope="col"><span class="sr-only">Aksi</span></th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</section>
+					</thead>
+					<tbody>
+						{#each shown as c (c.id)}
+							<tr class={!c.active ? 'opacity-70' : undefined}>
+								<td>
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() + the current query, built in detailHref -->
+									<a
+										class="font-semibold underline-offset-2 hover:underline"
+										href={detailHref(c.id)}>{c.name}</a
+									>
+									{#if !c.active}<span class="chip ml-1">Nonaktif</span>{/if}
+									{#if c.role}<span class="block text-small text-ink-2">{c.role}</span>{/if}
+								</td>
+								<td>
+									{#if c.phone}
+										<!-- eslint-disable svelte/no-navigation-without-resolve -- external wa.me chat link -->
+										<a
+											class="inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
+											href={waLink(c.phone)}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											<MessageCircle size={14} aria-hidden="true" />
+											{phoneDisplay(c.phone)}
+										</a>
+										<!-- eslint-enable svelte/no-navigation-without-resolve -->
+									{:else}<span class="text-ink-2">–</span>{/if}
+								</td>
+								<td class="text-right tabular-nums">{c.bookings}</td>
+								<td>
+									<span class="flex justify-end gap-1">
+										{#if data.allow.update}
+											<button
+												type="button"
+												class="icon-btn"
+												aria-label="Ubah {c.name}"
+												onclick={() => openForm(c)}
+											>
+												<Pencil size={16} aria-hidden="true" />
+											</button>
+										{/if}
+										{#if data.allow.delete}
+											<button
+												type="button"
+												class="icon-btn"
+												aria-label="Hapus {c.name}"
+												disabled={c.assigned > 0}
+												title={c.assigned > 0
+													? 'Sudah tercatat di booking. Nonaktifkan saja.'
+													: undefined}
+												onclick={() => {
+													deleteFor = c;
+													deleteOpen = true;
+												}}
+											>
+												<Trash2 size={16} aria-hidden="true" />
+											</button>
+										{/if}
+									</span>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</section>
+		{/if}
 	{/if}
 </div>
 
