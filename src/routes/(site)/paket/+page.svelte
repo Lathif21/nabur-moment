@@ -63,7 +63,20 @@
 								/>
 							{/if}
 							<h3 class="font-display text-[1.5rem]">{p.name}</h3>
-							<p class="font-display text-[1.75rem] lining-nums tabular-nums">{rupiah(p.price)}</p>
+							{#if p.normalPrice}
+								<p class="flex flex-wrap items-baseline gap-x-3 lining-nums tabular-nums">
+									<span class="font-display text-[1.75rem]"
+										><span class="sr-only">Harga promo </span>{rupiah(p.price)}</span
+									>
+									<s class="text-lead opacity-70"
+										><span class="sr-only">Harga normal </span>{rupiah(p.normalPrice)}</s
+									>
+								</p>
+							{:else}
+								<p class="font-display text-[1.75rem] lining-nums tabular-nums">
+									{rupiah(p.price)}
+								</p>
+							{/if}
 							{#if p.inclusions.length}
 								<ul class="flex list-disc flex-col gap-1.5 pl-5">
 									{#each p.inclusions as line, i (i)}<li>{line}</li>{/each}
