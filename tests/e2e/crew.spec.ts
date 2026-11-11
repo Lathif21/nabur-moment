@@ -67,7 +67,7 @@ test('add crew, assign two to a booking, see them on the card and the calendar',
 		await page.getByRole('button', { name: 'Tambah kru' }).first().click();
 		const modal = page.getByRole('dialog', { name: 'Tambah kru' });
 		await modal.getByLabel('Nama').fill(name);
-		await modal.getByLabel('Peran').fill(i === 2 ? 'Videografer' : 'Fotografer');
+		await modal.getByLabel('Peran', { exact: true }).fill(i === 2 ? 'Videografer' : 'Fotografer');
 		if (i === 0) await modal.getByLabel('WhatsApp').fill('0812-0000-1111');
 		await modal.getByRole('button', { name: 'Simpan' }).click();
 		await expect(page.getByText('Kru ditambahkan.').first()).toBeVisible();
@@ -96,11 +96,30 @@ test('add crew, assign two to a booking, see them on the card and the calendar',
 	await drawer.getByLabel('Nama klien').fill(`${PREFIX} Klien ${run}`);
 	await drawer.getByLabel('Judul').fill(title);
 	await drawer.getByLabel('Tanggal').fill(DAY);
-	const crewBox = drawer.getByRole('group', { name: 'Kru' });
-	await crewBox.getByLabel(new RegExp(names[0])).check();
-	await crewBox.getByLabel(new RegExp(names[1])).check();
-	await expect(crewBox.getByLabel(new RegExp(names[2]))).toBeDisabled();
-	await expect(crewBox.getByText('Dipilih 2.')).toBeVisible();
+	// Searchable multi-select: type to filter, pick two, the third is then disabled
+	const crewInput = drawer.getByRole('combobox', { name: 'Kru' });
+	const option = (name: string) => page.getByRole('option', { name: new RegExp(name) });
+	await crewInput.fill(names[0]);
+	await expect(option(names[1])).toHaveCount(0);
+	await option(names[0]).click();
+	await crewInput.fill(`fotografer ${run}`);
+	await expect(option(names[2])).toHaveCount(0);
+	await option(names[1]).click();
+	await crewInput.fill(run);
+	await expect(option(names[2])).toBeDisabled();
+	await page.keyboard.press('Escape');
+	await expect(drawer).toBeVisible();
+	const picked = drawer.getByRole('list', { name: 'Kru dipilih' });
+	await expect(picked).toContainText(names[0]);
+	await expect(picked).toContainText(names[1]);
+	await expect(drawer.getByText('Dipilih 2.')).toBeVisible();
+	// A chip can be removed and the crew picked again
+	await picked.getByRole('button', { name: `Hapus ${names[1]} dari kru` }).click();
+	await expect(drawer.getByText('Dipilih 1.')).toBeVisible();
+	await crewInput.fill(names[1]);
+	await option(names[1]).click();
+	await page.keyboard.press('Escape');
+	await expect(drawer.getByText('Dipilih 2.')).toBeVisible();
 	await drawer.getByRole('button', { name: 'Buat booking' }).click();
 	await expect(page.getByText(`Booking ${title} dibuat.`)).toBeVisible();
 
@@ -126,7 +145,7 @@ test('add crew, assign two to a booking, see them on the card and the calendar',
 	await page.goto(`/admin/kru?period=month&from=${DAY}`);
 	await page.waitForLoadState('networkidle');
 	const row = page.getByRole('row', { name: new RegExp(names[0]) });
-	await expect(row.getByRole('cell').nth(2)).toHaveText('0');
+	await expect(row.getByRole('cell').nth(4)).toHaveText('0'); // Nama, Kota, Perangkat, WhatsApp, Booking
 	await row.getByRole('link', { name: names[0] }).click();
 	await expect(page.getByRole('heading', { name: names[0], level: 1 })).toBeVisible();
 	await expect(page.getByText('Tidak ada booking (Booked ke atas)')).toBeVisible();

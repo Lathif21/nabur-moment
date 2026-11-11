@@ -13,14 +13,18 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { Combobox } from 'bits-ui';
+	import Check from '@lucide/svelte/icons/check';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import Plus from '@lucide/svelte/icons/plus';
+	import Search from '@lucide/svelte/icons/search';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import X from '@lucide/svelte/icons/x';
 	import Drawer from '#lib/components/admin/Drawer.svelte';
 	import Field from '#lib/components/form/Field.svelte';
 	import MoneyInput from '#lib/components/form/MoneyInput.svelte';
-	import { EVENT_TYPES, STAGES, type EventType } from '#lib/crm.ts';
+	import { STAGES, bookingEventTypes, crewMatches, type EventType } from '#lib/crm.ts';
 	import { dateID, phoneDisplay, rupiah } from '#lib/format.ts';
 	import { toast } from '#lib/toast.ts';
 
@@ -226,11 +230,17 @@
 		}, 300);
 	});
 
-	// ---------- crew (0–2) ----------
+	// ---------- crew (0–2): searchable multi-select, scales to dozens of crew ----------
 	const crewChoices = $derived(options.crew.filter((c) => c.active || savedCrew.includes(c.id)));
-	function toggleCrew(id: string, on: boolean) {
-		crewIds = on ? [...crewIds, id].slice(0, MAX_CREW) : crewIds.filter((x) => x !== id);
-	}
+	let crewQuery = $state('');
+	let crewOpen = $state(false);
+	const crewFiltered = $derived(
+		crewChoices.filter((c) => crewMatches({ ...c, phone: null }, crewQuery))
+	);
+	const crewSelected = $derived(
+		crewIds.map((id) => options.crew.find((c) => c.id === id)).filter((c) => !!c)
+	);
+	const removeCrew = (id: string) => (crewIds = crewIds.filter((x) => x !== id));
 
 	const sessionsJson = $derived(
 		JSON.stringify(
@@ -411,7 +421,9 @@
 				<Field label="Jenis acara" name="eventType" required errors={err('eventType')}>
 					{#snippet children(attrs)}
 						<select {...attrs} class="input" bind:value={eventType}>
-							{#each EVENT_TYPES as t (t.key)}<option value={t.key}>{t.label}</option>{/each}
+							{#each bookingEventTypes(eventType) as t (t.key)}<option value={t.key}
+									>{t.label}</option
+								>{/each}
 						</select>
 					{/snippet}
 				</Field>
@@ -451,7 +463,9 @@
 							<div class="field">
 								<label for="s{s.key}-type">Jenis sesi</label>
 								<select id="s{s.key}-type" class="input" bind:value={s.eventType}>
-									{#each EVENT_TYPES as t (t.key)}<option value={t.key}>{t.label}</option>{/each}
+									{#each bookingEventTypes(s.eventType) as t (t.key)}<option value={t.key}
+											>{t.label}</option
+										>{/each}
 								</select>
 							</div>
 							<div class="field">
@@ -521,39 +535,111 @@
 			</fieldset>
 
 			<!-- Crew -->
-			<fieldset class="flex flex-col gap-2" aria-describedby="booking-crew-hint">
-				<legend class="mb-1 font-semibold">Kru</legend>
-				<p id="booking-crew-hint" class="text-small text-ink-2">
-					Maksimal {MAX_CREW} kru per acara.{#if crewIds.length}
-						Dipilih {crewIds.length}.{/if}
-				</p>
-				{#if errors.crewIds}<p class="field__error">{errors.crewIds}</p>{/if}
+			<div class="field">
+				<label for="booking-crew-search">Kru</label>
 				{#if crewChoices.length}
-					<div class="grid gap-1 sm:grid-cols-2">
-						{#each crewChoices as c (c.id)}
-							{@const on = crewIds.includes(c.id)}
-							<label class="flex min-h-10 items-center gap-3">
-								<input
-									type="checkbox"
-									class="checkbox"
-									checked={on}
-									disabled={!on && crewIds.length >= MAX_CREW}
-									onchange={(e) => toggleCrew(c.id, e.currentTarget.checked)}
-								/>
-								<span
-									>{c.name}{#if c.role}<span class="text-ink-2">
-											· {c.role}</span
-										>{/if}{#if !c.active}<span class="text-ink-2"> (nonaktif)</span>{/if}</span
-								>
-							</label>
-						{/each}
-					</div>
-				{:else}
-					<p class="text-small text-ink-2">
-						Belum ada kru. Tambahkan di <a class="underline" href={resolve('admin/kru')}>Kru</a>.
-					</p>
+					<Combobox.Root
+						type="multiple"
+						bind:value={crewIds}
+						bind:open={crewOpen}
+						inputValue={crewQuery}
+						onValueChange={() => (crewQuery = '')}
+						onOpenChange={(o) => {
+							if (!o) crewQuery = '';
+						}}
+					>
+						<div class="relative">
+							<Search
+								size={16}
+								class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-2"
+								aria-hidden="true"
+							/>
+							<Combobox.Input
+								id="booking-crew-search"
+								class="input pr-11 pl-9"
+								autocomplete="off"
+								placeholder={crewIds.length >= MAX_CREW
+									? `Sudah ${MAX_CREW} kru, hapus satu untuk mengganti`
+									: 'Cari nama atau peran kru'}
+								oninput={(e) => {
+									crewQuery = e.currentTarget.value;
+									crewOpen = true; // bits-ui opens on keydown only; paste and autofill too
+								}}
+								aria-invalid={errors.crewIds ? 'true' : undefined}
+								aria-describedby="booking-crew-hint{errors.crewIds ? ' booking-crew-error' : ''}"
+							/>
+							<Combobox.Trigger
+								class="icon-btn absolute top-1/2 right-1 -translate-y-1/2"
+								aria-label="Tampilkan daftar kru"
+							>
+								<ChevronsUpDown size={16} aria-hidden="true" />
+							</Combobox.Trigger>
+						</div>
+						<Combobox.Portal>
+							<Combobox.Content
+								sideOffset={4}
+								class="z-50 w-(--bits-combobox-anchor-width) rounded-card border border-line bg-surface shadow-modal"
+							>
+								<Combobox.Viewport class="max-h-64 overflow-y-auto p-1">
+									{#each crewFiltered as c (c.id)}
+										{@const full = !crewIds.includes(c.id) && crewIds.length >= MAX_CREW}
+										<Combobox.Item
+											value={c.id}
+											label={c.name}
+											disabled={full}
+											aria-disabled={full ? 'true' : undefined}
+											class="flex min-h-10 cursor-pointer items-center gap-2 rounded-card px-2 data-disabled:cursor-not-allowed data-disabled:opacity-50 data-highlighted:bg-sage-20"
+										>
+											{#snippet children({ selected })}
+												<span class="flex size-4 shrink-0 items-center justify-center">
+													{#if selected}<Check size={16} aria-hidden="true" />{/if}
+												</span>
+												<span
+													>{c.name}{#if c.role}<span class="text-ink-2">
+															· {c.role}</span
+														>{/if}{#if !c.active}<span class="text-ink-2">
+															(nonaktif)</span
+														>{/if}</span
+												>
+											{/snippet}
+										</Combobox.Item>
+									{:else}
+										<p class="px-2 py-2 text-small text-ink-2">Tidak ada kru yang cocok.</p>
+									{/each}
+								</Combobox.Viewport>
+							</Combobox.Content>
+						</Combobox.Portal>
+					</Combobox.Root>
+					{#if crewSelected.length}
+						<ul class="flex flex-wrap gap-2" aria-label="Kru dipilih">
+							{#each crewSelected as c (c.id)}
+								<li class="chip min-h-8 pr-1 text-body">
+									{c.name}{#if c.role}<span class="font-normal text-ink-2">· {c.role}</span>{/if}
+									<button
+										type="button"
+										class="inline-flex size-6 items-center justify-center rounded-full hover:bg-surface"
+										aria-label="Hapus {c.name} dari kru"
+										onclick={() => removeCrew(c.id)}
+									>
+										<X size={14} aria-hidden="true" />
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				{/if}
-			</fieldset>
+				<p id="booking-crew-hint" class="field__hint">
+					{#if crewChoices.length}
+						Maksimal {MAX_CREW} kru per acara.{#if crewIds.length}
+							Dipilih {crewIds.length}.{/if}
+					{:else}
+						Belum ada kru. Tambahkan di <a class="underline" href={resolve('admin/kru')}>Kru</a>.
+					{/if}
+				</p>
+				{#if errors.crewIds}<p id="booking-crew-error" class="field__error">
+						{errors.crewIds}
+					</p>{/if}
+			</div>
 
 			<!-- Package + add-ons + price -->
 			<Field label="Paket" name="packageId" errors={err('packageId')}>
