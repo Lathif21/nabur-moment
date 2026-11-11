@@ -85,7 +85,7 @@
 					<input
 						type="search"
 						class="input pl-9"
-						placeholder="Nama, peran, 0812…"
+						placeholder="Nama, kota, perangkat, 0812…"
 						autocomplete="off"
 						bind:value={q}
 					/>
@@ -106,10 +106,12 @@
 			</EmptyState>
 		{:else}
 			<section class="card table-wrap" aria-label="Daftar kru">
-				<table class="table min-w-[40rem]">
+				<table class="table min-w-208">
 					<thead>
 						<tr>
 							<th scope="col">Nama</th>
+							<th scope="col">Kota</th>
+							<th scope="col">Perangkat</th>
 							<th scope="col">WhatsApp</th>
 							<th scope="col" class="text-right">Booking ({data.period.label})</th>
 							<th scope="col"><span class="sr-only">Aksi</span></th>
@@ -127,6 +129,8 @@
 									{#if !c.active}<span class="chip ml-1">Nonaktif</span>{/if}
 									{#if c.role}<span class="block text-small text-ink-2">{c.role}</span>{/if}
 								</td>
+								<td>{c.city || '–'}</td>
+								<td>{c.device || '–'}</td>
 								<td>
 									{#if c.phone}
 										<!-- eslint-disable svelte/no-navigation-without-resolve -- external wa.me chat link -->
@@ -219,6 +223,21 @@
 			<Field label="Peran" name="role" hint="Misal Fotografer, Videografer" errors={err('role')}>
 				{#snippet children(attrs)}
 					<input {...attrs} class="input" maxlength="60" defaultValue={editing?.role ?? ''} />
+				{/snippet}
+			</Field>
+			<Field label="Kota" name="city" hint="Domisili kru, misal Surabaya" errors={err('city')}>
+				{#snippet children(attrs)}
+					<input {...attrs} class="input" maxlength="60" defaultValue={editing?.city ?? ''} />
+				{/snippet}
+			</Field>
+			<Field
+				label="Perangkat"
+				name="device"
+				hint="Kamera atau HP yang dipakai, misal iPhone 15 Pro Max"
+				errors={err('device')}
+			>
+				{#snippet children(attrs)}
+					<input {...attrs} class="input" maxlength="120" defaultValue={editing?.device ?? ''} />
 				{/snippet}
 			</Field>
 			<Field label="WhatsApp" name="phone" errors={err('phone')}>

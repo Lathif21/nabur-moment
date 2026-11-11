@@ -26,7 +26,12 @@
 
 	<PageHeader
 		title={data.crew.name}
-		description={[data.crew.role, data.crew.active ? null : 'Nonaktif']
+		description={[
+			data.crew.role,
+			data.crew.city,
+			data.crew.device,
+			data.crew.active ? null : 'Nonaktif'
+		]
 			.filter(Boolean)
 			.join(' · ') || undefined}
 	>

@@ -67,13 +67,16 @@ export const waLink = (phone: string) => `https://wa.me/${phone}`;
 export const igLink = (handle: string) => `https://instagram.com/${encodeURIComponent(handle)}`;
 
 /**
- * Kru search: every word of `q` is in the name or role, or `q` is part of the WhatsApp number
+ * Kru search: every word of `q` is in the name, role, city or device, or `q` is part of the WhatsApp number
  * (typed as 0812…, 62812… or +62 812…; at least 3 digits).
  */
-export function crewMatches(c: { name: string; role: string; phone: string | null }, q: string) {
+export function crewMatches(
+	c: { name: string; role: string; phone: string | null; city?: string; device?: string },
+	q: string
+) {
 	const words = q.toLowerCase().split(/\s+/).filter(Boolean);
 	if (!words.length) return true;
-	const text = `${c.name} ${c.role}`.toLowerCase();
+	const text = `${c.name} ${c.role} ${c.city ?? ''} ${c.device ?? ''}`.toLowerCase();
 	if (words.every((w) => text.includes(w))) return true;
 	const digits = q.replace(/\D/g, '');
 	if (!c.phone || digits.length < 3 || /[a-z]/i.test(q)) return false;

@@ -10,7 +10,15 @@ import { ServiceError } from './errors.ts';
 /** One event is handled by 1 or 2 crew */
 export const MAX_CREW_PER_BOOKING = 2;
 
-export type CrewInput = { name: string; role: string; phone: string | null; active: boolean };
+export type CrewInput = {
+	name: string;
+	role: string;
+	phone: string | null;
+	/** Omitted = '' on create, unchanged on update */
+	city?: string;
+	device?: string;
+	active: boolean;
+};
 
 /** Earliest dated session = Hari H (columns written out: Drizzle leaves them unqualified) */
 const hariHSql = sql<
@@ -40,6 +48,8 @@ export async function listCrew(db: DbOrTx, period: { from: string; to: string })
 			name: crew.name,
 			role: crew.role,
 			phone: crew.phone,
+			city: crew.city,
+			device: crew.device,
 			active: crew.active,
 			bookings: sql<number>`coalesce(${counts.n}, 0)::int`,
 			/** All-time assignments (any stage): delete is refused when > 0 */

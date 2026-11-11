@@ -80,8 +80,13 @@ describe.runIf(isDevDb)('crew', () => {
 				name: 'E2E Andi',
 				role: 'Fotografer',
 				phone: '6281200000001',
+				city: 'Surabaya',
+				device: 'iPhone 15 Pro',
 				active: true
 			});
+			// City and device reach the Kru list; omitted = ''
+			const listed = (await listCrew(tx, MONTH)).find((c) => c.id === andi.id)!;
+			expect(listed).toMatchObject({ city: 'Surabaya', device: 'iPhone 15 Pro' });
 			const budi = await createCrew(tx, { name: 'E2E Budi', role: '', phone: null, active: true });
 			const sari = await createCrew(tx, { name: 'E2E Sari', role: '', phone: null, active: true });
 
@@ -127,6 +132,17 @@ describe.runIf(isDevDb)('crew', () => {
 				updateBooking(tx, none.id, edit(none, '0899-7009-0001', [andi.id]), null),
 				/nonaktif/
 			);
+
+			// An update that omits city / device leaves them as they were
+			expect((await listCrew(tx, MONTH)).find((c) => c.id === andi.id)).toMatchObject({
+				city: 'Surabaya',
+				device: 'iPhone 15 Pro',
+				active: false
+			});
+			expect((await listCrew(tx, MONTH)).find((c) => c.id === budi.id)).toMatchObject({
+				city: '',
+				device: ''
+			});
 
 			// Delete only when never assigned
 			await rejects(deleteCrew(tx, budi.id), /Nonaktifkan/);

@@ -120,6 +120,13 @@
       "when": 1794331895341,
       "tag": "0016_app_settings_signature",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794386210593,
+      "tag": "0017_crew_city_device",
+      "breakpoints": true
     }
   ]
 }

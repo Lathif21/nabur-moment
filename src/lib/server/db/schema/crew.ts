@@ -12,6 +12,10 @@ export const crew = pgTable('crew', {
 	role: text('role').default('').notNull(),
 	/** WhatsApp as 628… (phoneNormalize) */
 	phone: text('phone'),
+	/** Home base, e.g. "Surabaya" (free text, '' = unknown) */
+	city: text('city').default('').notNull(),
+	/** Gear they shoot with, e.g. "iPhone 15 Pro Max" (free text, '' = unknown) */
+	device: text('device').default('').notNull(),
 	/** Inactive crew leave the picker; their past bookings keep them */
 	active: boolean('active').default(true).notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

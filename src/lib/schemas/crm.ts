@@ -297,6 +297,8 @@ export const crewSchema = z.object({
 	name: z.string().trim().min(1, 'Nama wajib diisi.').max(120),
 	role: z.string().trim().max(60).default(''),
 	phone: optionalPhone,
+	city: z.string().trim().max(60).default(''),
+	device: z.string().trim().max(120).default(''),
 	// Checkbox: present = on
 	active: z
 		.string()

@@ -13,6 +13,11 @@ describe('crewMatches', () => {
 		expect(crewMatches(andi, 'pratama FOTO')).toBe(true);
 		expect(crewMatches(andi, 'video')).toBe(false);
 		expect(crewMatches(andi, 'andi video')).toBe(false);
+		// City and device are searchable too
+		const sby = { ...andi, city: 'Surabaya', device: 'iPhone 15 Pro' };
+		expect(crewMatches(sby, 'surabaya')).toBe(true);
+		expect(crewMatches(sby, 'iphone andi')).toBe(true);
+		expect(crewMatches(sby, 'bekasi')).toBe(false);
 	});
 
 	it('matches the WhatsApp number however it is typed', () => {
