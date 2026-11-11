@@ -8,7 +8,7 @@
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import { WEEKDAYS_ID, monthLabel, shiftMonth } from '#lib/calendar.ts';
-	import { EVENT_TYPES, EVENT_TYPE_LABEL, STAGE_LABEL, stageTone } from '#lib/crm.ts';
+	import { ADMIN_EVENT_LABEL, bookingEventTypes, STAGE_LABEL, stageTone } from '#lib/crm.ts';
 	import { dateID, rupiah } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
@@ -41,7 +41,7 @@
 		e.currentTarget.form?.requestSubmit();
 
 	const chipText = (it: Item) =>
-		[EVENT_TYPE_LABEL[it.eventType], it.title, it.startTime].filter(Boolean).join(' · ');
+		[ADMIN_EVENT_LABEL[it.eventType], it.title, it.startTime].filter(Boolean).join(' · ');
 
 	// ---------- booking drawer ----------
 	let selected = $state<Item | null>(null);
@@ -158,7 +158,9 @@
 				onchange={submitOnChange}
 			>
 				<option value="">Semua jenis</option>
-				{#each EVENT_TYPES as e (e.key)}<option value={e.key}>{e.label}</option>{/each}
+				{#each bookingEventTypes(data.filter.eventType) as e (e.key)}<option value={e.key}
+						>{e.label}</option
+					>{/each}
 			</select>
 			<input type="hidden" name="tentatif" value="0" />
 			<label class="inline-flex items-center gap-2 text-body">
@@ -279,7 +281,7 @@
 				<ul class="card divide-y divide-line">
 					{#each siblings as s (s.id)}
 						<li class={['flex flex-col gap-0.5 px-3 py-2', s.id === selected.id && 'bg-sage-20']}>
-							<span class="font-semibold">{EVENT_TYPE_LABEL[s.eventType]}</span>
+							<span class="font-semibold">{ADMIN_EVENT_LABEL[s.eventType]}</span>
 							<span class="text-body"
 								>{dateID(s.date, 'long')}{#if time(s)}
 									· {time(s)} WIB{/if}</span

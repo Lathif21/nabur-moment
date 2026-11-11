@@ -5,7 +5,13 @@
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import BookingDrawer from '#lib/components/crm/BookingDrawer.svelte';
-	import { EVENT_TYPES, EVENT_TYPE_LABEL, STAGES, STAGE_LABEL, stageTone } from '#lib/crm.ts';
+	import {
+		ADMIN_EVENT_LABEL,
+		bookingEventTypes,
+		STAGES,
+		STAGE_LABEL,
+		stageTone
+	} from '#lib/crm.ts';
 	import { countdown, dateID, rupiah } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
@@ -68,7 +74,9 @@
 				onchange={submitOnChange}
 			>
 				<option value="">Semua jenis</option>
-				{#each EVENT_TYPES as t (t.key)}<option value={t.key}>{t.label}</option>{/each}
+				{#each bookingEventTypes(data.filter.eventType) as t (t.key)}<option value={t.key}
+						>{t.label}</option
+					>{/each}
 			</select>
 		</label>
 		<label class="field">
@@ -112,7 +120,7 @@
 									href={resolve('/admin/(app)/booking/[id]', { id: b.id })}>{b.title}</a
 								>
 								<span class="block text-small text-ink-2">
-									{EVENT_TYPE_LABEL[b.eventType]}{b.packageName ? ` · ${b.packageName}` : ''} · {b.sessions}
+									{ADMIN_EVENT_LABEL[b.eventType]}{b.packageName ? ` · ${b.packageName}` : ''} · {b.sessions}
 									sesi
 								</span>
 							</td>

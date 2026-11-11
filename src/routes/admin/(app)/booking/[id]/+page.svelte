@@ -19,7 +19,7 @@
 	import MoveMenu from '#lib/components/kanban/MoveMenu.svelte';
 	import {
 		ACTIVITY_LABEL,
-		EVENT_TYPE_LABEL,
+		ADMIN_EVENT_LABEL,
 		STAGES,
 		STAGE_LABEL,
 		stageTone,
@@ -141,7 +141,7 @@
 
 	<PageHeader
 		title={b.title}
-		description="{EVENT_TYPE_LABEL[b.eventType]} · dibuat {dateID(b.createdAt)}{b.origin ===
+		description="{ADMIN_EVENT_LABEL[b.eventType]} · dibuat {dateID(b.createdAt)}{b.origin ===
 		'website_form'
 			? ' dari formulir website'
 			: ''}"
@@ -221,7 +221,7 @@
 						{#each b.sessions as s, i (s.id)}
 							<li class="flex flex-col gap-1 px-4 py-3">
 								<p class="flex flex-wrap items-center gap-2">
-									<span class="font-semibold">{EVENT_TYPE_LABEL[s.eventType]}</span>
+									<span class="font-semibold">{ADMIN_EVENT_LABEL[s.eventType]}</span>
 									{#if i === 0 && s.date}<span class="chip">Hari H</span>{/if}
 								</p>
 								<p class="text-body">

@@ -9,7 +9,7 @@
 	import BookingMoveDialogs from '#lib/components/crm/BookingMoveDialogs.svelte';
 	import KanbanBoard, { type KanbanColumn } from '#lib/components/kanban/KanbanBoard.svelte';
 	import MoveMenu from '#lib/components/kanban/MoveMenu.svelte';
-	import { EVENT_TYPE_LABEL, STAGES } from '#lib/crm.ts';
+	import { ADMIN_EVENT_LABEL, STAGES } from '#lib/crm.ts';
 	import { countdown, dateID, rupiahShort } from '#lib/format.ts';
 	import { toLanes, type KanbanMove } from '#lib/kanban.ts';
 	import type { PageProps } from './$types';
@@ -80,7 +80,7 @@
 			<article class="kcard flex flex-col gap-1.5 rounded-card border border-line bg-surface p-3">
 				<div class="flex items-start justify-between gap-2">
 					<span class="min-w-0 truncate text-small text-ink-2">{c.clientName}</span>
-					<span class="chip shrink-0">{EVENT_TYPE_LABEL[c.eventType]}</span>
+					<span class="chip shrink-0">{ADMIN_EVENT_LABEL[c.eventType]}</span>
 				</div>
 				<h3 class="text-body leading-snug font-semibold">
 					<a

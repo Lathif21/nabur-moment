@@ -5,7 +5,7 @@
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import PeriodFilter from '#lib/components/admin/PeriodFilter.svelte';
 	import StatTile from '#lib/components/admin/StatTile.svelte';
-	import { EVENT_TYPE_LABEL } from '#lib/crm.ts';
+	import { ADMIN_EVENT_LABEL } from '#lib/crm.ts';
 	import { INVOICE_STATUS_LABEL, invoiceTone } from '#lib/finance.ts';
 	import { countdown, dateID, rupiah, rupiahShort } from '#lib/format.ts';
 	import type { PageProps } from './$types';
@@ -85,7 +85,7 @@
 									{:else}{s.title}{/if}
 								</p>
 								<p class="text-small text-ink-2">
-									{EVENT_TYPE_LABEL[s.eventType]} · {dateID(s.date!, 'long')}{s.startTime
+									{ADMIN_EVENT_LABEL[s.eventType]} · {dateID(s.date!, 'long')}{s.startTime
 										? ` · ${s.startTime}`
 										: ''} · {s.clientName}
 								</p>

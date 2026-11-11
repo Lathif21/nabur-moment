@@ -6,7 +6,7 @@
 	import EmptyState from '#lib/components/admin/EmptyState.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import PeriodFilter from '#lib/components/admin/PeriodFilter.svelte';
-	import { EVENT_TYPE_LABEL, STAGE_LABEL, stageTone, waLink } from '#lib/crm.ts';
+	import { ADMIN_EVENT_LABEL, STAGE_LABEL, stageTone, waLink } from '#lib/crm.ts';
 	import { dateID, phoneDisplay } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
@@ -100,7 +100,7 @@
 								<ul class="flex flex-col gap-0.5 text-small">
 									{#each j.sessions as s, i (i)}
 										<li>
-											<span class="font-semibold">{EVENT_TYPE_LABEL[s.eventType]}</span>
+											<span class="font-semibold">{ADMIN_EVENT_LABEL[s.eventType]}</span>
 											{#if s.date}· {dateID(s.date)}{/if}
 											{#if s.startTime}· {s.startTime}{/if}
 											{#if s.venue || s.city}<span class="text-ink-2">

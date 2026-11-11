@@ -13,7 +13,7 @@
 	import StatTile from '#lib/components/admin/StatTile.svelte';
 	import ActivityTimeline from '#lib/components/crm/ActivityTimeline.svelte';
 	import ClientDrawer from '#lib/components/crm/ClientDrawer.svelte';
-	import { EVENT_TYPE_LABEL, STAGE_LABEL, igLink, stageTone, waLink } from '#lib/crm.ts';
+	import { ADMIN_EVENT_LABEL, STAGE_LABEL, igLink, stageTone, waLink } from '#lib/crm.ts';
 	import { dateID, phoneDisplay, rupiah, rupiahShort } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
@@ -120,7 +120,7 @@
 									href={resolve('/admin/(app)/booking/[id]', { id: b.id })}>{b.title}</a
 								>
 								<p class="text-small text-ink-2">
-									{EVENT_TYPE_LABEL[b.eventType]} · {b.firstDate
+									{ADMIN_EVENT_LABEL[b.eventType]} · {b.firstDate
 										? `Hari H ${dateID(b.firstDate)}`
 										: 'Tanggal belum ditentukan'}
 								</p>

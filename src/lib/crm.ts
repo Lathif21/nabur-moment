@@ -48,6 +48,30 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = Object.fromEntries(
 	EVENT_TYPES.map((e) => [e.key, e.label])
 ) as Record<EventType, string>;
 
+/** Admin wording (client feedback 12 Nov 2026): "Full Wedding"; the website keeps "Wedding" */
+export const ADMIN_EVENT_LABEL: Record<EventType, string> = {
+	...EVENT_TYPE_LABEL,
+	wedding: 'Full Wedding'
+};
+
+/**
+ * Booking and session types offered in the admin: no Lamaran (the website form and portfolio
+ * still have it, so a booking may still carry it; `bookingEventTypes` then keeps it selectable).
+ */
+export const BOOKING_EVENT_TYPES = EVENT_TYPES.filter((e) => e.key !== 'lamaran').map((e) => ({
+	key: e.key,
+	label: ADMIN_EVENT_LABEL[e.key]
+}));
+
+/** Admin options for a booking / session select, keeping a no-longer-offered current value */
+export function bookingEventTypes(current?: string | null) {
+	if (!current || BOOKING_EVENT_TYPES.some((e) => e.key === current)) return BOOKING_EVENT_TYPES;
+	const kept = EVENT_TYPES.find((e) => e.key === current);
+	return kept
+		? [...BOOKING_EVENT_TYPES, { key: kept.key, label: ADMIN_EVENT_LABEL[kept.key] }]
+		: BOOKING_EVENT_TYPES;
+}
+
 export const ACTIVITY_LABEL: Record<string, string> = {
 	note: 'Catatan',
 	call: 'Telepon',
