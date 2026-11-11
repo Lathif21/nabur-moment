@@ -111,7 +111,11 @@ export async function listBoard(db: DbOrTx, today = dayKeyWib()) {
 			packageName: sql<string | null>`${booking.packageSnapshot}->>'name'`,
 			clientId: booking.clientId,
 			clientName: client.name,
-			nextDate: nextDateSql(today)
+			nextDate: nextDateSql(today),
+			/** Sum of payments, for the "Lunas" chip */
+			paid: sql<number>`(select coalesce(sum(p.amount), 0)::bigint from "payment" p where p.booking_id = "booking"."id")`.mapWith(
+				Number
+			)
 		})
 		.from(booking)
 		.innerJoin(client, eq(client.id, booking.clientId))

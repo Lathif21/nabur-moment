@@ -20,6 +20,7 @@
 	import {
 		ACTIVITY_LABEL,
 		ADMIN_EVENT_LABEL,
+		paymentChip,
 		STAGES,
 		STAGE_LABEL,
 		stageTone,
@@ -49,6 +50,7 @@
 	const open = $derived(b.stage !== 'lost' && b.stage !== 'completed');
 	const addonTotal = $derived(b.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0));
 	const paid = $derived(data.payments.reduce((sum, p) => sum + p.amount, 0));
+	const payChip = $derived(paymentChip({ ...b, paid }));
 	const costs = $derived(data.expenses.reduce((sum, e) => sum + e.amount, 0));
 
 	// ---------- expenses (P3-05) ----------
@@ -174,12 +176,12 @@
 				<span class="text-ink-2">Tanggal belum ditentukan</span>
 			{/if}
 		</span>
-		{#if b.stage !== 'lost'}
-			{#if b.bookedAt}
-				<span class="chip chip--success">DP lunas {dateID(b.bookedAt)}</span>
-			{:else}
-				<span class="chip chip--warning">Belum DP</span>
-			{/if}
+		{#if payChip}
+			<span class="chip {payChip.tone}"
+				>{payChip.label}{payChip.label === 'DP lunas' && b.bookedAt
+					? ` ${dateID(b.bookedAt)}`
+					: ''}</span
+			>
 		{/if}
 		<span class="inline-flex flex-wrap items-center gap-2">
 			<a

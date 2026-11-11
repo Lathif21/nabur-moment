@@ -12,6 +12,7 @@ import {
 	bookingSession,
 	client,
 	packageCategory,
+	payment,
 	pkg
 } from '../db/schema/index';
 import {
@@ -197,6 +198,26 @@ describe.runIf(isDevDb)('bookings service', () => {
 				null
 			);
 			expect((await order()).at(-1)).toBe(c.id);
+		}));
+
+	it('sums payments on board cards for the Lunas chip', () =>
+		inRollback(async (tx) => {
+			const made = await createBooking(tx, input(), null);
+			const card = async () => (await listBoard(tx)).find((x) => x.id === made.id)!;
+			expect((await card()).paid).toBe(0);
+			for (const [n, amount] of [
+				['E2E-KW-1', 600_000],
+				['E2E-KW-2', 630_000]
+			] as const) {
+				await tx.insert(payment).values({
+					bookingId: made.id,
+					receiptNumber: n,
+					paidOn: D1,
+					amount,
+					method: 'transfer'
+				});
+			}
+			expect((await card()).paid).toBe(1_230_000);
 		}));
 
 	it('refuses Booked and later without a paid DP; Batal needs a reason; Selesai warns', () =>

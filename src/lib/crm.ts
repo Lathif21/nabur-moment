@@ -106,3 +106,20 @@ export function crewMatches(
 	if (!c.phone || digits.length < 3 || /[a-z]/i.test(q)) return false;
 	return c.phone.slice(2).includes(digits.replace(/^(62|0)/, ''));
 }
+
+/**
+ * Payment chip on a booking: "Lunas" once payments cover the agreed price, "DP lunas" once the
+ * DP is paid (`booked_at`), otherwise "Belum DP". None for Batal bookings.
+ */
+export function paymentChip(b: {
+	stage: Stage;
+	bookedAt: unknown;
+	agreedPrice: number;
+	paid: number;
+}): { label: string; tone: string } | null {
+	if (b.stage === 'lost') return null;
+	if (b.agreedPrice > 0 && b.paid >= b.agreedPrice)
+		return { label: 'Lunas', tone: 'chip--success' };
+	if (b.bookedAt) return { label: 'DP lunas', tone: 'chip--success' };
+	return { label: 'Belum DP', tone: 'chip--warning' };
+}

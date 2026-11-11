@@ -9,7 +9,7 @@
 	import BookingMoveDialogs from '#lib/components/crm/BookingMoveDialogs.svelte';
 	import KanbanBoard, { type KanbanColumn } from '#lib/components/kanban/KanbanBoard.svelte';
 	import MoveMenu from '#lib/components/kanban/MoveMenu.svelte';
-	import { ADMIN_EVENT_LABEL, STAGES } from '#lib/crm.ts';
+	import { ADMIN_EVENT_LABEL, paymentChip, STAGES } from '#lib/crm.ts';
 	import { countdown, dateID, rupiahShort } from '#lib/format.ts';
 	import { toLanes, type KanbanMove } from '#lib/kanban.ts';
 	import type { PageProps } from './$types';
@@ -115,12 +115,9 @@
 				</p>
 				<div class="mt-1 flex items-center gap-2">
 					<span class="font-semibold tabular-nums">{rupiahShort(c.agreedPrice)}</span>
-					{#if c.stage !== 'lost'}
-						{#if c.bookedAt}
-							<span class="chip chip--success">DP lunas</span>
-						{:else}
-							<span class="chip chip--warning">Belum DP</span>
-						{/if}
+					{#if paymentChip(c)}
+						{@const pay = paymentChip(c)!}
+						<span class="chip {pay.tone}">{pay.label}</span>
 					{/if}
 					<span class="flex-1"></span>
 					{#if data.allow.update}
