@@ -1,5 +1,6 @@
 // Payments (P3-04, 02-DATA-MODEL payment, 04-ARCHITECTURE payments.record): money in for a booking,
-// against an invoice or an installment. Recording runs in one transaction: insert (kwitansi
+// against an invoice or an installment. Every payment has an invoice: paying an installment that
+// has none creates it first. Recording runs in one transaction: insert (kwitansi
 // number) → invoice status → DP fully paid sets `booked_at` → activity. Every function takes `db`
 // or an open transaction first.
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
@@ -14,11 +15,16 @@ import {
 	payment
 } from '../db/schema/index.ts';
 import { BOOKED_STAGES, STAGE_LABEL } from '../../crm.ts';
-import { INSTALLMENT_LABEL, PAYMENT_METHOD_LABEL, type InvoiceStatus } from '../../finance.ts';
+import {
+	INSTALLMENT_LABEL,
+	PAYMENT_METHOD_LABEL,
+	suggestedDueDate,
+	type InvoiceStatus
+} from '../../finance.ts';
 import { dayKeyWib, rupiah } from '../../format.ts';
 import type { PaymentFilter, PaymentInput } from '../../schemas/finance.ts';
 import { ServiceError } from './errors.ts';
-import { bookingContractLines, nextNumber } from './invoices.ts';
+import { bookingContractLines, insertInstallmentInvoice, nextNumber } from './invoices.ts';
 import { PRIVATE_BUCKET } from '../storage/files.ts';
 
 const sumAmount = sql<number>`coalesce(sum(${payment.amount}), 0)::bigint`.mapWith(Number);
@@ -129,6 +135,12 @@ export async function recordPayment(db: DbOrTx, input: PaymentInput, userId: str
 		let installmentId: string | null;
 		let open: number;
 		let label: string;
+		/** Installment paid without an invoice yet: its invoice is created below (every payment has one) */
+		let toInvoice: {
+			id: string;
+			kind: 'dp' | 'pelunasan' | 'other';
+			dueDate: string | null;
+		} | null = null;
 		if (input.target.kind === 'inv') {
 			const [inv] = await tx
 				.select()
@@ -161,11 +173,25 @@ export async function recordPayment(db: DbOrTx, input: PaymentInput, userId: str
 			installmentId = inst.id;
 			open = inst.amount - (await installmentPaid(tx, inst.id));
 			label = INSTALLMENT_LABEL[inst.kind];
+			if (!inv) toInvoice = inst;
 		}
 		if (open <= 0) throw new ServiceError('Tagihan ini sudah lunas.', 'target');
 		if (input.amount > open)
 			throw new ServiceError(`Jumlah melebihi sisa tagihan (${rupiah(open)}).`, 'amount');
 		if (input.proofMediaId) await checkProof(tx, input.proofMediaId);
+
+		if (toInvoice) {
+			// Bills what is still open on the installment, dated the payment day
+			const inv = await insertInstallmentInvoice(tx, {
+				bookingId: b.id,
+				installment: toInvoice,
+				total: open,
+				issueDate: input.paidOn,
+				dueDate: suggestedDueDate(toInvoice.kind, toInvoice.dueDate, input.paidOn),
+				userId
+			});
+			invoiceId = inv.id;
+		}
 
 		const receiptNumber = await nextNumber(tx, 'KW', input.paidOn);
 		const [row] = await tx
@@ -300,7 +326,7 @@ export async function listPayments(db: DbOrTx, f: Partial<PaymentFilter> = {}) {
 
 /**
  * What a booking can still be paid for, for the payment form: open invoices, and installments
- * that have no active invoice, each with the amount still open.
+ * that have no active invoice (paying one creates its invoice), each with the amount still open.
  */
 export async function paymentTargets(db: DbOrTx, bookingId: string) {
 	const [installments, invoices] = await Promise.all([
@@ -333,10 +359,19 @@ export async function paymentTargets(db: DbOrTx, bookingId: string) {
 			.orderBy(asc(invoice.issueDate), asc(invoice.number))
 	]);
 	const invoiced = new Set(invoices.map((i) => i.installmentId).filter(Boolean));
+	const kindOf = new Map(installments.map((i) => [i.id, i.kind]));
 	return [
 		...invoices
 			.filter((i) => i.total - i.paid > 0)
-			.map((i) => ({ value: `inv:${i.id}`, label: i.number, open: i.total - i.paid })),
+			.map((i) => {
+				const kind = i.installmentId ? kindOf.get(i.installmentId) : undefined;
+				return {
+					value: `inv:${i.id}`,
+					// "DP 50% · INV/NM/…" so the termin stays recognisable once it has its invoice
+					label: kind ? `${INSTALLMENT_LABEL[kind]} · ${i.number}` : i.number,
+					open: i.total - i.paid
+				};
+			}),
 		...installments
 			.filter((i) => !i.cancelledAt && !invoiced.has(i.id) && i.amount - i.paid > 0)
 			.map((i) => ({

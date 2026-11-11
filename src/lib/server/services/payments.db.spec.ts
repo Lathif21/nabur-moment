@@ -125,26 +125,48 @@ describe.runIf(isDevDb)('payments', () => {
 			expect(cal.items.find((i) => i.bookingId === made.id)?.booked).toBe(true);
 		}));
 
-	it('pays an installment without an invoice; Selesai needs no confirmation once fully paid', () =>
-		inRollback(async (tx) => {
-			const made = await newBooking(tx, '0899-7007-0002');
-			const [dp, pelunasan] = await listSchedule(tx, made.id);
-			expect((await paymentTargets(tx, made.id)).map((t) => t.value)).toEqual([
-				`inst:${dp.id}`,
-				`inst:${pelunasan.id}`
-			]);
-			await recordPayment(tx, pay(made.id, `inst:${dp.id}`, 5_000_000), null);
-			await moveBooking(tx, move(made.id, 'booked'), null);
-			// Balance left: Selesai asks for confirmation
-			await rejects(moveBooking(tx, move(made.id, 'completed'), null), /sisa tagihan/);
-			await recordPayment(tx, pay(made.id, `inst:${pelunasan.id}`, 5_000_000), null);
-			await moveBooking(tx, move(made.id, 'completed'), null);
-			expect(await paymentTargets(tx, made.id)).toEqual([]);
-			await rejects(
-				recordPayment(tx, pay(made.id, `inst:${pelunasan.id}`, 1), null),
-				/sudah lunas/
-			);
-		}));
+	it(
+		'paying an installment without an invoice creates its invoice; Selesai needs no confirmation once fully paid',
+		() =>
+			inRollback(async (tx) => {
+				const made = await newBooking(tx, '0899-7007-0002');
+				const [dp, pelunasan] = await listSchedule(tx, made.id);
+				expect((await paymentTargets(tx, made.id)).map((t) => t.value)).toEqual([
+					`inst:${dp.id}`,
+					`inst:${pelunasan.id}`
+				]);
+				// Every payment has an invoice: a part of the DP creates the DP invoice for what is open
+				const first = await recordPayment(tx, pay(made.id, `inst:${dp.id}`, 2_000_000), null);
+				expect(first.invoiceId).not.toBeNull();
+				const [inv] = await tx.select().from(invoice).where(eq(invoice.id, first.invoiceId!));
+				expect(inv).toMatchObject({
+					installmentId: dp.id,
+					total: 5_000_000,
+					issueDate: '2033-06-01',
+					dueDate: '2033-06-08',
+					status: 'partial'
+				});
+				expect(inv.number).toMatch(/^INV\/NM\/2033\/06\/\d{3,}$/);
+				// The rest of the DP goes onto that same invoice
+				const second = await recordPayment(tx, pay(made.id, `inst:${dp.id}`, 3_000_000), null);
+				expect(second.invoiceId).toBe(inv.id);
+				expect(await status(tx, inv.id)).toBe('paid');
+				await moveBooking(tx, move(made.id, 'booked'), null);
+				// Balance left: Selesai asks for confirmation
+				await rejects(moveBooking(tx, move(made.id, 'completed'), null), /sisa tagihan/);
+				const last = await recordPayment(tx, pay(made.id, `inst:${pelunasan.id}`, 5_000_000), null);
+				// Pelunasan invoice: due on Hari H
+				const [pInv] = await tx.select().from(invoice).where(eq(invoice.id, last.invoiceId!));
+				expect(pInv).toMatchObject({ installmentId: pelunasan.id, dueDate: DAY, status: 'paid' });
+				await moveBooking(tx, move(made.id, 'completed'), null);
+				expect(await paymentTargets(tx, made.id)).toEqual([]);
+				await rejects(
+					recordPayment(tx, pay(made.id, `inst:${pelunasan.id}`, 1), null),
+					/sudah lunas/
+				);
+			}),
+		30_000
+	); // four payments, two invoices over the network
 
 	it('deleting the DP payment is refused once Booked; before that it clears booked_at and the status', () =>
 		inRollback(async (tx) => {

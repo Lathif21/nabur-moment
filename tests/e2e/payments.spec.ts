@@ -128,6 +128,8 @@ test('DP paid in two parts → Booked → solid on the calendar', async ({ page 
 	await expect(page.getByText(/Pembayaran KW\/NM\/\d{4}\/\d{2}\/\d{3,} dicatat\.$/)).toBeVisible();
 	const row = page.getByRole('row', { name: new RegExp(TITLE) });
 	await expect(row).toContainText(/2\.000\.000/);
+	// Every payment has an invoice: paying the DP created it
+	await expect(row).toContainText(/DP 50%\s*INV\/NM\/\d{4}\/\d{2}\/\d{3,}/);
 
 	// The proof opens through the permission-checked route (redirect to a presigned GET)
 	const href = await row.getByRole('link', { name: /Lihat bukti/ }).getAttribute('href');

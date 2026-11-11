@@ -154,6 +154,59 @@ async function logInvoice(
 	});
 }
 
+/**
+ * Insert an installment's invoice (number, contract lines, activity) inside an open transaction.
+ * Shared by "Buat invoice", by recordPayment (every payment has an invoice: paying an installment
+ * without one creates it) and by the backfill script. Callers check the booking and the amount.
+ */
+export async function insertInstallmentInvoice(
+	tx: DbOrTx,
+	args: {
+		bookingId: string;
+		installment: { id: string; kind: 'dp' | 'pelunasan' | 'other' };
+		total: number;
+		issueDate: string;
+		dueDate: string;
+		notes?: string | null;
+		userId: string | null;
+	}
+) {
+	const [b] = await tx
+		.select({
+			id: booking.id,
+			clientId: booking.clientId,
+			title: booking.title,
+			agreedPrice: booking.agreedPrice,
+			packageSnapshot: booking.packageSnapshot
+		})
+		.from(booking)
+		.where(eq(booking.id, args.bookingId));
+	if (!b) throw new ServiceError('Booking tidak ditemukan.');
+	const number = await nextNumber(tx, 'INV', args.issueDate);
+	const [row] = await tx
+		.insert(invoice)
+		.values({
+			number,
+			bookingId: b.id,
+			installmentId: args.installment.id,
+			issueDate: args.issueDate,
+			dueDate: args.dueDate,
+			items: await contractItems(tx, b),
+			total: args.total,
+			notes: args.notes ?? null,
+			createdBy: args.userId
+		})
+		.returning();
+	await logInvoice(
+		tx,
+		row,
+		b.clientId,
+		`Invoice ${number} dibuat: ${INSTALLMENT_LABEL[args.installment.kind]}, ${rupiah(args.total)}`,
+		args.userId
+	);
+	return row;
+}
+
 /** "Buat invoice" for the DP or the pelunasan: bills what is still unpaid on that installment */
 export async function createInstallmentInvoice(
 	db: DbOrTx,
@@ -188,29 +241,15 @@ export async function createInstallmentInvoice(
 		const total = inst.amount - paid;
 		if (total <= 0) throw new ServiceError('Termin ini sudah lunas.', 'installmentId');
 
-		const number = await nextNumber(tx, 'INV', input.issueDate);
-		const [row] = await tx
-			.insert(invoice)
-			.values({
-				number,
-				bookingId: b.id,
-				installmentId: inst.id,
-				issueDate: input.issueDate,
-				dueDate: input.dueDate,
-				items: await contractItems(tx, b),
-				total,
-				notes: input.notes,
-				createdBy: userId
-			})
-			.returning();
-		await logInvoice(
-			tx,
-			row,
-			b.clientId,
-			`Invoice ${number} dibuat: ${INSTALLMENT_LABEL[inst.kind]}, ${rupiah(total)}`,
+		return insertInstallmentInvoice(tx, {
+			bookingId: b.id,
+			installment: inst,
+			total,
+			issueDate: input.issueDate,
+			dueDate: input.dueDate,
+			notes: input.notes,
 			userId
-		);
-		return row;
+		});
 	});
 }
 

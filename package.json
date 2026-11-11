@@ -20,7 +20,8 @@
 		"db:studio": "drizzle-kit studio",
 		"user:create": "tsx scripts/create-user.ts",
 		"storage:cors": "tsx scripts/storage-cors.ts",
-		"content:audit": "tsx scripts/content-audit.ts"
+		"content:audit": "tsx scripts/content-audit.ts",
+		"payments:backfill-invoices": "tsx scripts/backfill-payment-invoices.ts"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.ts",
