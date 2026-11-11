@@ -8,7 +8,8 @@
 //     came in before it (total = those payments, so it is paid).
 // Dry run by default; `--apply` writes. Safe to re-run: linked payments are skipped.
 //   npm run payments:backfill-invoices                          (DATABASE_URL from .env = dev)
-//   npm run payments:backfill-invoices -- --url "<conn>" --apply
+//   npx tsx scripts/backfill-payment-invoices.ts --url "<conn>" --apply   (any branch; npx keeps --url
+//   in Windows PowerShell, where `npm run … -- --url` can drop it)
 import { and, asc, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client.ts';
 import {
@@ -34,6 +35,11 @@ if (!url) {
 	console.error('No DATABASE_URL: pass --url "<connection string>"');
 	process.exit(1);
 }
+// Say which database this is: in Windows PowerShell `npm run … -- --url` can lose `--url`,
+// silently falling back to .env (the dev branch)
+console.log(
+	`Database: ${new URL(url).hostname} (${i > 0 ? '--url' : `.env, NEON_BRANCH=${process.env.NEON_BRANCH ?? '?'}`})`
+);
 
 const db = createDb(url);
 try {
