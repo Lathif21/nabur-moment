@@ -10,6 +10,7 @@
 	import Modal from '#lib/components/admin/Modal.svelte';
 	import PageHeader from '#lib/components/admin/PageHeader.svelte';
 	import Field from '#lib/components/form/Field.svelte';
+	import PasswordInput from '#lib/components/form/PasswordInput.svelte';
 	import { refreshThenToast } from '#lib/enhance.ts';
 	import { toast } from '#lib/toast.ts';
 	import type { PageProps } from './$types';
@@ -230,7 +231,7 @@
 			errors={addErrors.password ? [addErrors.password] : undefined}
 		>
 			{#snippet children(attrs)}
-				<input {...attrs} class="input" type="password" autocomplete="new-password" />
+				<PasswordInput {...attrs} autocomplete="new-password" />
 			{/snippet}
 		</Field>
 		{@render roleChecks([])}
@@ -295,7 +296,7 @@
 			errors={resetErrors.password ? [resetErrors.password] : undefined}
 		>
 			{#snippet children(attrs)}
-				<input {...attrs} class="input" type="password" autocomplete="new-password" />
+				<PasswordInput {...attrs} autocomplete="new-password" />
 			{/snippet}
 		</Field>
 	</form>

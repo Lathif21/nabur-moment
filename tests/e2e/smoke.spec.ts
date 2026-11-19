@@ -51,6 +51,32 @@ test('admin redirects to login when logged out; wrong password is refused', asyn
 	await expect(page.getByRole('alert')).toHaveText('Email atau kata sandi salah.');
 });
 
+test('login: the password can be shown, and "Lupa kata sandi?" answers the same for any email', async ({
+	page
+}) => {
+	await page.goto('/admin/login');
+	await hydrated(page);
+	const field = page.getByLabel('Kata sandi', { exact: true });
+	await field.fill('rahasia-123');
+	await expect(field).toHaveAttribute('type', 'password');
+	await page.getByRole('button', { name: 'Tampilkan sandi' }).click();
+	await expect(field).toHaveAttribute('type', 'text');
+
+	await page.getByRole('link', { name: 'Lupa kata sandi?' }).click();
+	await expect(page).toHaveURL(/\/admin\/lupa-sandi$/);
+	await hydrated(page);
+	await page.getByLabel('Email').fill(`tidak-ada-${Date.now()}@naburmoment.test`);
+	await page.getByRole('button', { name: 'Kirim tautan' }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cek email Anda');
+});
+
+test('reset link: a bad or missing token asks for a new link', async ({ page }) => {
+	await page.goto('/admin/reset-sandi?token=bukan-token');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tautan tidak berlaku');
+	await page.getByRole('link', { name: 'Minta tautan baru' }).click();
+	await expect(page).toHaveURL(/\/admin\/lupa-sandi$/);
+});
+
 test('sign-up endpoint is closed', async ({ request }) => {
 	const res = await request.post('/api/auth/sign-up/email', {
 		data: { email: 'penyusup@naburmoment.test', password: 'rahasia-123', name: 'Penyusup' }

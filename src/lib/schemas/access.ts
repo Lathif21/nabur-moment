@@ -24,6 +24,23 @@ export const resetPasswordSchema = z.object({
 	password: optionalPassword.default('')
 });
 
+/** "Lupa kata sandi?": the email the reset link goes to */
+export const forgotPasswordSchema = z.object({
+	email: z.email('Email tidak valid.').trim().toLowerCase().max(200)
+});
+
+/** New password from a reset link, typed twice */
+export const newPasswordSchema = z
+	.object({
+		token: z.string().min(1),
+		password: z.string().min(MIN_PASSWORD, `Kata sandi minimal ${MIN_PASSWORD} karakter.`).max(128),
+		confirm: z.string()
+	})
+	.refine((v) => v.password === v.confirm, {
+		message: 'Kedua kata sandi tidak sama.',
+		path: ['confirm']
+	});
+
 export const userRolesSchema = z.object({
 	userId: z.string().min(1),
 	roleIds: z.array(z.uuid()).default([])

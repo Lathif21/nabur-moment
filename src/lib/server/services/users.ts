@@ -2,9 +2,9 @@
 // the owner adds people in Akses & Peran → Pengguna (P0-06) or with the script.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { hashPassword } from 'better-auth/crypto';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gt } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
-import { account, role, session, user, userRole } from '../db/schema/index.ts';
+import { account, role, session, user, userRole, verification } from '../db/schema/index.ts';
 import { ServiceError } from './errors.ts';
 
 export const MIN_PASSWORD = 8;
@@ -54,6 +54,24 @@ export async function createUser(
 		});
 		return { id, email, password, generated: !input.password };
 	});
+}
+
+/**
+ * Whether a "lupa kata sandi" link is still usable, so the reset page can say so before the user
+ * types a new password. Better Auth stores the token as `reset-password:<token>` in `verification`.
+ */
+export async function isResetTokenValid(db: DbOrTx, token: string) {
+	if (!token) return false;
+	const [row] = await db
+		.select({ id: verification.id })
+		.from(verification)
+		.where(
+			and(
+				eq(verification.identifier, `reset-password:${token}`),
+				gt(verification.expiresAt, new Date())
+			)
+		);
+	return !!row;
 }
 
 /** Whether a user may hold a session (exists and is active) */
