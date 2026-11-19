@@ -1,10 +1,18 @@
 // P3-05 "Done when": booking profit = its payments − its expenses; overhead rows have no booking.
-// From the UI: "Tambah biaya" on the booking page (with a receipt photo) changes Biaya and Laba;
+// From the UI: "Tambah biaya" on the booking page (with a HEIC receipt photo, converted to JPEG
+// in the browser) changes Biaya and Laba;
 // an overhead expense from Pengeluaran shows under Overhead only. Dev branch only; cleans up.
 import { expect, test, type Page } from '@playwright/test';
-import { inArray, like } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 import { createDb } from '../../src/lib/server/db/client.ts';
-import { booking, client, expense, media, payment } from '../../src/lib/server/db/schema/index.ts';
+import {
+	booking,
+	client,
+	expense,
+	invoice,
+	media,
+	payment
+} from '../../src/lib/server/db/schema/index.ts';
 import { bookingSchema } from '../../src/lib/schemas/crm.ts';
 import { paymentSchema } from '../../src/lib/schemas/finance.ts';
 import { createBooking } from '../../src/lib/server/services/bookings.ts';
@@ -92,6 +100,8 @@ test.afterAll(async () => {
 			).map((b) => b.id);
 			if (bookings.length) {
 				await db.delete(payment).where(inArray(payment.bookingId, bookings));
+				// Every payment has an invoice: the DP payment created one
+				await db.delete(invoice).where(inArray(invoice.bookingId, bookings));
 				await db.delete(booking).where(inArray(booking.id, bookings));
 			}
 			await db.delete(client).where(inArray(client.id, clients));
@@ -128,10 +138,25 @@ test('booking cost changes Biaya and Laba; overhead stays out of Per booking', a
 	await drawer.getByLabel('Jumlah').fill('1500000');
 	await drawer.getByLabel('Kategori').selectOption({ label: 'Fee crew' });
 	await drawer.getByLabel('Keterangan').fill(`${PREFIX} second shooter ${run}`);
+	// An iPad Photo Library pick arrives as HEIC; the browser converts it to JPEG before the PUT
+	// (Edge cannot decode real HEIC, but it sniffs the PNG bytes, so this takes the same path)
 	await drawer
 		.getByLabel('Foto nota (opsional)')
-		.setInputFiles({ name: 'nota.png', mimeType: 'image/png', buffer: PNG });
-	await expect(drawer.getByText('Terunggah: nota.png')).toBeVisible({ timeout: 30_000 });
+		.setInputFiles({ name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: PNG });
+	await expect(drawer.getByText('Terunggah: IMG_0001.HEIC')).toBeVisible({ timeout: 30_000 });
+	const receiptId = await drawer.locator('input[name="receiptMediaId"]').inputValue();
+	{
+		const db = createDb(process.env.DATABASE_URL!);
+		try {
+			const [row] = await db
+				.select({ mime: media.mime, filename: media.filename })
+				.from(media)
+				.where(eq(media.id, receiptId));
+			expect(row).toEqual({ mime: 'image/jpeg', filename: 'IMG_0001.jpg' });
+		} finally {
+			await db.$client.end();
+		}
+	}
 	await drawer.getByRole('button', { name: 'Simpan' }).click();
 	await expect(page.getByText('Pengeluaran dicatat.')).toBeVisible();
 
@@ -155,6 +180,11 @@ test('booking cost changes Biaya and Laba; overhead stays out of Per booking', a
 	await d2.getByLabel('Kategori').selectOption({ label: 'Iklan' });
 	await expect(d2.getByLabel('Booking')).toHaveValue('');
 	await d2.getByLabel('Keterangan').fill(OVERHEAD);
+	// Receipt upload from the Pengeluaran page itself (presigned PUT → confirm)
+	await d2
+		.getByLabel('Foto nota (opsional)')
+		.setInputFiles({ name: 'iklan.png', mimeType: 'image/png', buffer: PNG });
+	await expect(d2.getByText('Terunggah: iklan.png')).toBeVisible({ timeout: 30_000 });
 	await d2.getByRole('button', { name: 'Simpan' }).click();
 	await expect(page.getByText('Pengeluaran dicatat.')).toBeVisible();
 
@@ -163,6 +193,33 @@ test('booking cost changes Biaya and Laba; overhead stays out of Per booking', a
 	await expect(rows).toHaveCount(1);
 	await expect(rows.first()).toHaveAttribute('data-scope', 'overhead');
 	await expect(rows.first()).toContainText('Overhead');
+	const firstReceipt = await rows
+		.first()
+		.getByRole('link', { name: /Lihat nota/ })
+		.getAttribute('href');
+	expect((await page.request.get(firstReceipt!, { maxRedirects: 0 })).status()).toBe(303);
+
+	// Edit: replace the receipt with a new upload
+	await rows
+		.first()
+		.getByRole('button', { name: /Ubah pengeluaran/ })
+		.click();
+	const d3 = page.getByRole('dialog', { name: 'Ubah pengeluaran' });
+	await expect(d3.getByText('Nota sudah ada.', { exact: false })).toBeVisible();
+	await d3
+		.getByLabel('Foto nota (opsional)')
+		.setInputFiles({ name: 'iklan-2.png', mimeType: 'image/png', buffer: PNG });
+	await expect(d3.getByText('Terunggah: iklan-2.png')).toBeVisible({ timeout: 30_000 });
+	await d3.getByRole('button', { name: 'Simpan' }).click();
+	await expect(d3).toBeHidden();
+	const secondReceipt = await rows
+		.first()
+		.getByRole('link', { name: /Lihat nota/ })
+		.getAttribute('href');
+	expect(secondReceipt).not.toBe(firstReceipt);
+	expect((await page.request.get(secondReceipt!, { maxRedirects: 0 })).status()).toBe(303);
+	// The replaced receipt is gone
+	expect((await page.request.get(firstReceipt!, { maxRedirects: 0 })).status()).toBe(404);
 
 	await page.goto(`/admin/keuangan/pengeluaran?q=${encodeURIComponent(run)}&jenis=booking`);
 	await expect(rows).toHaveCount(1);

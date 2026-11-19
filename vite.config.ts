@@ -67,7 +67,10 @@ export default defineConfig(({ command }) => ({
 					name: 'db',
 					environment: 'node',
 					include: ['src/**/*.db.spec.ts'],
-					fileParallelism: false
+					fileParallelism: false,
+					// Multi-step specs over the network pass 5 s now and then; a test cut off by the
+					// timeout skips its cleanup and leaves rows that break the next run
+					testTimeout: 30_000
 				}
 			}
 		]

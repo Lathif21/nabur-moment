@@ -155,7 +155,8 @@ test('a user without invoice access cannot open or void invoices', async ({ page
 	await page.getByLabel('Kata sandi').fill(STAFF_PASSWORD);
 	await page.getByRole('button', { name: 'Masuk' }).click();
 	await expect(page).toHaveURL(/\/admin\/klien$/);
-	await expect(page.getByRole('link', { name: 'Invoice' })).toHaveCount(0);
+	// Exact: client rows left by other specs (e.g. "E2E CRM Spec Invoice") are links too
+	await expect(page.getByRole('link', { name: 'Invoice', exact: true })).toHaveCount(0);
 
 	const view = await page.request.get(`/admin/keuangan/invoice/${id}`);
 	expect(view.status()).toBe(403);

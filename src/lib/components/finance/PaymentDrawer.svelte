@@ -196,7 +196,7 @@
 			bind:value={proofId}
 			bind:uploading
 			error={errors.proofMediaId}
-			hint="Tangkapan layar transfer, JPG / PNG / WebP, maks. 10 MB. Disimpan privat."
+			hint="Tangkapan layar transfer atau foto, maks. 10 MB. Disimpan privat."
 		/>
 
 		<div class="field">

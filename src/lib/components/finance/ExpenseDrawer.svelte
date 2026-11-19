@@ -188,7 +188,7 @@
 			error={errors.receiptMediaId}
 			hint={expense?.receiptMediaId && receipt === expense.receiptMediaId
 				? 'Nota sudah ada. Pilih file lain untuk menggantinya.'
-				: 'JPG / PNG / WebP, maks. 10 MB. Disimpan privat.'}
+				: 'Foto atau JPG / PNG / WebP, maks. 10 MB. Disimpan privat.'}
 		/>
 	</form>
 	{#snippet footer()}
