@@ -174,12 +174,16 @@
 			</div>
 
 			{#if data.packages.length}
-				<fieldset class="flex flex-col gap-3" aria-describedby="packageIds-hint">
+				<fieldset
+					class="flex flex-col gap-3"
+					aria-describedby={t.packageHint ? 'packageIds-hint' : undefined}
+				>
 					<legend class="text-small font-semibold">{t.packageLabel}</legend>
 					{#if t.packageHint}<p id="packageIds-hint" class="field__hint -mt-1.5">
 							{t.packageHint}
 						</p>{/if}
-					{#each packageGroups as g (g.category)}
+					<!-- Keyed by the first package: two categories may share a name -->
+					{#each packageGroups as g (g.packages[0].id)}
 						<div class="flex flex-col gap-1">
 							{#if packageGroups.length > 1}<p class="text-small text-ink-2">{g.category}</p>{/if}
 							<div class="grid gap-x-5 sm:grid-cols-2">
