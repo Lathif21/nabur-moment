@@ -120,7 +120,7 @@
 									href={resolve('/admin/(app)/booking/[id]', { id: b.id })}>{b.title}</a
 								>
 								<span class="block text-small text-ink-2">
-									{ADMIN_EVENT_LABEL[b.eventType]}{b.packageName ? ` · ${b.packageName}` : ''} · {b.sessions}
+									{ADMIN_EVENT_LABEL[b.eventType]}{b.packageNames ? ` · ${b.packageNames}` : ''} · {b.sessions}
 									sesi
 								</span>
 							</td>

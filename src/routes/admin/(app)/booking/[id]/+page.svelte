@@ -49,6 +49,7 @@
 	const b = $derived(data.booking);
 	const open = $derived(b.stage !== 'lost' && b.stage !== 'completed');
 	const addonTotal = $derived(b.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0));
+	const packageTotal = $derived(b.packages.reduce((s, p) => s + p.price, 0));
 	const paid = $derived(data.payments.reduce((sum, p) => sum + p.amount, 0));
 	const payChip = $derived(paymentChip({ ...b, paid }));
 	const costs = $derived(data.expenses.reduce((sum, e) => sum + e.amount, 0));
@@ -269,24 +270,24 @@
 			<section class="flex flex-col gap-3" aria-labelledby="package-title">
 				<h2 id="package-title" class="font-display text-section-title">Paket & add-on</h2>
 				<div class="card flex flex-col gap-3 px-4 py-3">
-					{#if b.packageSnapshot}
-						<div class="flex flex-wrap items-baseline justify-between gap-2">
-							<p>
-								<span class="font-semibold">{b.packageSnapshot.name}</span>
-								{#if b.packageSnapshot.category}<span class="text-small text-ink-2">
-										· {b.packageSnapshot.category}</span
-									>{/if}
-							</p>
-							<span class="tabular-nums">{rupiah(b.packageSnapshot.price)}</span>
+					{#each b.packages as p, i (p.id)}
+						<div class={['flex flex-col gap-1', i > 0 && 'border-t border-line pt-3']}>
+							<div class="flex flex-wrap items-baseline justify-between gap-2">
+								<p>
+									<span class="font-semibold">{p.name}</span>
+									{#if p.category}<span class="text-small text-ink-2"> · {p.category}</span>{/if}
+								</p>
+								<span class="tabular-nums">{rupiah(p.price)}</span>
+							</div>
+							{#if p.inclusions.length}
+								<ul class="list-disc pl-5 text-small text-ink-2">
+									{#each p.inclusions as item, j (j)}<li>{item}</li>{/each}
+								</ul>
+							{/if}
 						</div>
-						{#if b.packageSnapshot.inclusions.length}
-							<ul class="list-disc pl-5 text-small text-ink-2">
-								{#each b.packageSnapshot.inclusions as item, i (i)}<li>{item}</li>{/each}
-							</ul>
-						{/if}
 					{:else}
 						<p class="text-body text-ink-2">Tanpa paket.</p>
-					{/if}
+					{/each}
 					{#if b.addons.length}
 						<ul class="flex flex-col gap-1 border-t border-line pt-3">
 							{#each b.addons as a (a.id)}
@@ -301,9 +302,9 @@
 						<span>Harga disepakati</span>
 						<span class="tabular-nums">{rupiah(b.agreedPrice)}</span>
 					</p>
-					{#if b.packageSnapshot && b.agreedPrice !== b.packageSnapshot.price + addonTotal}
+					{#if b.packages.length && b.agreedPrice !== packageTotal + addonTotal}
 						<p class="text-small text-ink-2">
-							Harga diubah manual (paket + add-on = {rupiah(b.packageSnapshot.price + addonTotal)}).
+							Harga diubah manual (paket + add-on = {rupiah(packageTotal + addonTotal)}).
 						</p>
 					{/if}
 				</div>

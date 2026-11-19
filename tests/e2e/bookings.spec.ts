@@ -5,6 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { eq, inArray, like } from 'drizzle-orm';
 import { createDb } from '../../src/lib/server/db/client.ts';
 import { booking, client } from '../../src/lib/server/db/schema/index.ts';
+import { addTestPackages, removeTestPackages } from './helpers/packages.ts';
 
 try {
 	process.loadEnvFile();
@@ -26,6 +27,12 @@ test.skip(
 	'needs the dev branch and E2E_EMAIL / E2E_PASSWORD'
 );
 
+/** Two packages to pick in the drawer */
+let pkgs: Awaited<ReturnType<typeof addTestPackages>> | null = null;
+test.beforeAll(async () => {
+	pkgs = await addTestPackages(`${PREFIX} Paket ${run}`);
+});
+
 test.afterAll(async () => {
 	const db = createDb(process.env.DATABASE_URL!);
 	try {
@@ -42,6 +49,7 @@ test.afterAll(async () => {
 	} finally {
 		await db.$client.end();
 	}
+	if (pkgs) await removeTestPackages(pkgs.categoryId);
 });
 
 async function login(page: Page) {
@@ -92,8 +100,20 @@ test('create bookings, keep order after refresh, refuse Booked without DP, Batal
 	await drawer.getByLabel('Judul').fill(A);
 	await drawer.getByLabel('Tanggal').fill(DAY);
 	await drawer.getByLabel('Tanggal').blur();
+	// More than one package: a picked package leaves the list, the prices add up
+	const [pA, pB] = pkgs!.packages;
+	const addPackage = drawer.getByLabel('Tambah paket');
+	await addPackage.selectOption(pA.id);
+	await expect(addPackage.locator(`option[value="${pA.id}"]`)).toHaveCount(0);
+	await addPackage.selectOption(pB.id);
+	const picked = drawer.getByRole('list', { name: 'Paket dipilih' }).getByRole('listitem');
+	await expect(picked).toHaveCount(2);
+	await expect(drawer.getByLabel('Harga disepakati')).toHaveValue('6.500.000');
 	await drawer.getByRole('button', { name: 'Buat booking' }).click();
 	await expect(page.getByText(`Booking ${A} dibuat.`)).toBeVisible();
+	await expect(column(page, 'Inquiry').getByRole('article').filter({ hasText: A })).toContainText(
+		`${pA.name} + ${pB.name}`
+	);
 
 	// Booking B for the same client on the same date: the form warns but allows it
 	await page.getByRole('button', { name: 'Booking baru' }).click();

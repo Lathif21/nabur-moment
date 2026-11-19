@@ -13,7 +13,8 @@ import type { Actions, PageServerLoad } from './$types';
 export const config = { isr: false };
 
 // Booking / inquiry (03-SCREENS A6): intro from the CMS, packages from the published list,
-// lead sources for "Tahu kami dari mana". ?paket=<id> preselects a package in the browser.
+// lead sources for "Tahu kami dari mana". Visitors may tick several packages; ?paket=<id>
+// (comma-separated for more) preselects them in the browser.
 export const load: PageServerLoad = async (event) => {
 	const [page, packages, sources] = await Promise.all([
 		loadPublicPage(event, 'inquiry'),
@@ -32,7 +33,7 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions: Actions = {
 	default: async ({ request }) => {
-		const raw = formObject(await request.formData());
+		const raw = formObject(await request.formData(), ['packageIds']);
 		// Honeypot filled: act as if it worked, save nothing
 		if (typeof raw.website === 'string' && raw.website.trim()) {
 			redirect(303, resolve('booking/terima-kasih'));

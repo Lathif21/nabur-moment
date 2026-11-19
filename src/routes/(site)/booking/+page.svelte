@@ -18,8 +18,23 @@
 	const image = $derived(m(intro.data.image));
 	const fields = $derived((form?.fields ?? {}) as Record<string, string>);
 	const values = $derived((form?.values ?? {}) as Record<string, string>);
-	// ?paket=<id> from "Pilih paket"; read in the browser because cached pages ignore the query
-	const preselected = $derived(values.packageId ?? page.url.searchParams.get('paket') ?? '');
+	// Ticked before a failed submit, else ?paket=<id>[,<id>] from "Pilih paket" (read in the
+	// browser because cached pages ignore the query)
+	const preselected = $derived.by(() => {
+		const sent = (form?.values as { packageIds?: unknown } | undefined)?.packageIds;
+		if (Array.isArray(sent)) return new Set(sent.map(String));
+		return new Set((page.url.searchParams.get('paket') ?? '').split(',').filter(Boolean));
+	});
+	/** Published packages grouped by category, in site order */
+	const packageGroups = $derived.by(() => {
+		const groups: { category: string; packages: typeof data.packages }[] = [];
+		for (const p of data.packages) {
+			const last = groups.at(-1);
+			if (last?.category === p.category) last.packages.push(p);
+			else groups.push({ category: p.category, packages: [p] });
+		}
+		return groups;
+	});
 	let sending = $state(false);
 
 	const err = (k: string) => fields[k];
@@ -158,16 +173,35 @@
 				{@render text('city', t.cityLabel, { autocomplete: 'address-level2' })}
 			</div>
 
+			{#if data.packages.length}
+				<fieldset class="flex flex-col gap-3" aria-describedby="packageIds-hint">
+					<legend class="text-small font-semibold">{t.packageLabel}</legend>
+					{#if t.packageHint}<p id="packageIds-hint" class="field__hint -mt-1.5">
+							{t.packageHint}
+						</p>{/if}
+					{#each packageGroups as g (g.category)}
+						<div class="flex flex-col gap-1">
+							{#if packageGroups.length > 1}<p class="text-small text-ink-2">{g.category}</p>{/if}
+							<div class="grid gap-x-5 sm:grid-cols-2">
+								{#each g.packages as p (p.id)}
+									<label class="flex min-h-11 cursor-pointer items-center gap-3">
+										<input
+											type="checkbox"
+											class="checkbox shrink-0"
+											name="packageIds"
+											value={p.id}
+											checked={preselected.has(p.id)}
+										/>
+										<span>{p.name}</span>
+									</label>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</fieldset>
+			{/if}
+
 			<div class="grid gap-5 sm:grid-cols-2">
-				<div class="flex flex-col gap-1.5">
-					<label for="f-packageId" class="text-small font-semibold">{t.packageLabel}</label>
-					<select id="f-packageId" name="packageId" class="input min-h-12! rounded-btn!">
-						<option value="belum" selected={!preselected}>{t.packageNone}</option>
-						{#each data.packages as p (p.id)}
-							<option value={p.id} selected={preselected === p.id}>{p.name} · {p.category}</option>
-						{/each}
-					</select>
-				</div>
 				<div class="flex flex-col gap-1.5">
 					<label for="f-sourceId" class="text-small font-semibold">{t.sourceLabel}</label>
 					<select id="f-sourceId" name="sourceId" class="input min-h-12! rounded-btn!">

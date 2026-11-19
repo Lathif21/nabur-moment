@@ -41,7 +41,7 @@ export async function submitInquiry(db: DbOrTx, input: Omit<InquiryInput, 'websi
 			clientId,
 			title: `${eventLabel} ${input.name}`.slice(0, 120),
 			eventType: input.eventType as EventType,
-			packageId: input.packageId,
+			packageIds: input.packageIds,
 			message: input.message,
 			sessionDate: input.eventDate,
 			venue: input.venue,

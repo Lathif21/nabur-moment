@@ -100,7 +100,7 @@
 				{:else}
 					<p class="text-small text-ink-2">Tanggal belum ditentukan</p>
 				{/if}
-				{#if c.packageName}<p class="truncate text-small text-ink-2">{c.packageName}</p>{/if}
+				{#if c.packageNames}<p class="truncate text-small text-ink-2">{c.packageNames}</p>{/if}
 				<p class="flex items-start gap-1.5 text-small">
 					<Camera size={14} class="mt-0.5 shrink-0 text-ink-2" aria-hidden="true" />
 					{#if c.crew.length}

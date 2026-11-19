@@ -24,7 +24,7 @@ const input = {
 	eventDate: null,
 	venue: null,
 	city: null,
-	packageId: null,
+	packageIds: [],
 	sourceId: null,
 	message: 'spec'
 };

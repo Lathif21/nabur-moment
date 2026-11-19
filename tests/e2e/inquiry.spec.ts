@@ -4,7 +4,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { eq, inArray } from 'drizzle-orm';
 import { createDb } from '../../src/lib/server/db/client.ts';
-import { booking, client } from '../../src/lib/server/db/schema/index.ts';
+import { booking, bookingPackage, client } from '../../src/lib/server/db/schema/index.ts';
+import { addTestPackages, removeTestPackages } from './helpers/packages.ts';
 
 try {
 	process.loadEnvFile();
@@ -18,6 +19,13 @@ const botDigits = String(Date.now() + 7).slice(-8);
 const botStored = `62813${botDigits}`;
 
 test.skip(process.env.NEON_BRANCH !== 'dev', 'needs the dev branch');
+
+/** Two published packages to tick on the form */
+const PKG = `E2E Paket ${digits}`;
+let pkgCategory = '';
+test.beforeAll(async () => {
+	pkgCategory = (await addTestPackages(PKG, { publish: true })).categoryId;
+});
 
 async function rows(phoneStored: string) {
 	const db = createDb(process.env.DATABASE_URL!);
@@ -34,7 +42,18 @@ async function rows(phoneStored: string) {
 						)
 					)
 			: [];
-		return { clients, bookings };
+		const packages = bookings.length
+			? await db
+					.select()
+					.from(bookingPackage)
+					.where(
+						inArray(
+							bookingPackage.bookingId,
+							bookings.map((b) => b.id)
+						)
+					)
+			: [];
+		return { clients, bookings, packages };
 	} finally {
 		await db.$client.end();
 	}
@@ -55,6 +74,7 @@ test.afterAll(async () => {
 	} finally {
 		await db.$client.end();
 	}
+	if (pkgCategory) await removeTestPackages(pkgCategory, { publish: true });
 });
 
 async function fillForm(page: Page, opts: { phone: string; name: string }) {
@@ -71,13 +91,20 @@ async function fillForm(page: Page, opts: { phone: string; name: string }) {
 test('inquiry creates one booking; the same WhatsApp reuses the client', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 
-	// Validation stays on the form
+	// Validation stays on the form and keeps the ticked packages
 	await page.goto('/booking');
 	await page.waitForLoadState('networkidle');
+	await page.getByLabel(`${PKG} A`).check();
+	await page.getByLabel(`${PKG} B`).check();
 	await page.getByRole('button', { name: 'Kirim' }).click();
 	await expect(page.getByText('No. WhatsApp wajib diisi.')).toBeVisible();
+	await expect(page.getByLabel(`${PKG} A`)).toBeChecked();
+	await expect(page.getByLabel(`${PKG} B`)).toBeChecked();
 
+	// A client may pick more than one package
 	await fillForm(page, { phone, name: 'Uji Inquiry' });
+	await page.getByLabel(`${PKG} A`).check();
+	await page.getByLabel(`${PKG} B`).check();
 	await page.getByRole('button', { name: 'Kirim' }).click();
 	await expect(page).toHaveURL(/\/booking\/terima-kasih$/);
 	await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -91,6 +118,8 @@ test('inquiry creates one booking; the same WhatsApp reuses the client', async (
 		eventType: 'akad',
 		inquiryMessage: 'Halo, mau tanya paket akad.'
 	});
+	expect(r.packages.map((p) => p.name).sort()).toEqual([`${PKG} A`, `${PKG} B`]);
+	expect(r.bookings[0].agreedPrice).toBe(6_500_000);
 
 	// Same number written differently: no second client, a second booking
 	await fillForm(page, {

@@ -97,14 +97,6 @@ export const client = pgTable(
 	]
 );
 
-/** Name, price and inclusions copied when the package is picked (site edits don't change bookings) */
-export type PackageSnapshot = {
-	name: string;
-	price: number;
-	inclusions: string[];
-	category?: string;
-};
-
 export const booking = pgTable(
 	'booking',
 	{
@@ -114,10 +106,7 @@ export const booking = pgTable(
 			.references(() => client.id, { onDelete: 'restrict' }),
 		title: text('title').notNull(),
 		eventType: eventType('event_type').notNull(),
-		// The booking keeps its own package snapshot, so deleting a package only clears the link
-		packageId: uuid('package_id').references(() => pkg.id, { onDelete: 'set null' }),
-		packageSnapshot: jsonb('package_snapshot').$type<PackageSnapshot>(),
-		/** whole Rupiah = package price + add-ons (no discounts) */
+		/** whole Rupiah = packages + add-ons (no discounts) */
 		agreedPrice: bigint('agreed_price', { mode: 'number' }).default(0).notNull(),
 		stage: bookingStage('stage').default('inquiry').notNull(),
 		/** fractional index inside its stage column */
@@ -181,6 +170,35 @@ export const bookingSession = pgTable(
 	]
 );
 
+/**
+ * Packages on a booking (a client may take several). Name, price and inclusions are copied when the
+ * package is picked, so site edits don't change bookings and deleting a package only clears the link.
+ */
+export const bookingPackage = pgTable(
+	'booking_package',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		bookingId: uuid('booking_id')
+			.notNull()
+			.references(() => booking.id, { onDelete: 'cascade' }),
+		packageId: uuid('package_id').references(() => pkg.id, { onDelete: 'set null' }),
+		/** snapshot */
+		name: text('name').notNull(),
+		/** snapshot, whole Rupiah */
+		price: bigint('price', { mode: 'number' }).notNull(),
+		/** snapshot */
+		inclusions: jsonb('inclusions').$type<string[]>().default([]).notNull(),
+		/** snapshot of the category name */
+		category: text('category'),
+		sort: smallint('sort').default(0).notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [
+		index('booking_package_booking_idx').on(t.bookingId),
+		check('booking_package_price_nonneg', sql`${t.price} >= 0`)
+	]
+);
+
 export const bookingAddon = pgTable(
 	'booking_addon',
 	{
@@ -241,12 +259,17 @@ export const clientRelations = relations(client, ({ one, many }) => ({
 export const bookingRelations = relations(booking, ({ one, many }) => ({
 	client: one(client, { fields: [booking.clientId], references: [client.id] }),
 	sessions: many(bookingSession),
+	packages: many(bookingPackage),
 	addons: many(bookingAddon),
 	activities: many(activity)
 }));
 
 export const bookingSessionRelations = relations(bookingSession, ({ one }) => ({
 	booking: one(booking, { fields: [bookingSession.bookingId], references: [booking.id] })
+}));
+
+export const bookingPackageRelations = relations(bookingPackage, ({ one }) => ({
+	booking: one(booking, { fields: [bookingPackage.bookingId], references: [booking.id] })
 }));
 
 export const bookingAddonRelations = relations(bookingAddon, ({ one }) => ({

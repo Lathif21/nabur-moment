@@ -127,6 +127,13 @@
       "when": 1794386210593,
       "tag": "0017_crew_city_device",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795092093526,
+      "tag": "0018_booking_packages",
+      "breakpoints": true
     }
   ]
 }

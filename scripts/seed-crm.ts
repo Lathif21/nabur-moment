@@ -11,6 +11,7 @@ import {
 	activity,
 	booking,
 	bookingAddon,
+	bookingPackage,
 	bookingInstallment,
 	bookingSession,
 	client,
@@ -53,7 +54,7 @@ type Demo = {
 	eventType: EventType;
 	stage: Stage;
 	price: number;
-	package?: { name: string; price: number; inclusions: string[] };
+	packages?: { name: string; price: number; inclusions: string[] }[];
 	addons?: { name: string; unitPrice: number; qty?: number }[];
 	sessions: { eventType: EventType; offset: number | null; venue?: string; start?: string }[];
 	origin?: 'website_form' | 'manual';
@@ -108,7 +109,7 @@ const DEMOS: Demo[] = [
 		eventType: 'lamaran',
 		stage: 'consultation',
 		price: lamaran.price,
-		package: lamaran,
+		packages: [lamaran],
 		sessions: [{ eventType: 'lamaran', offset: 30, venue: 'Rumah mempelai wanita', start: '10:00' }]
 	},
 	{
@@ -116,10 +117,12 @@ const DEMOS: Demo[] = [
 		title: 'Wedding Dinda & Fajar',
 		eventType: 'wedding',
 		stage: 'quotation',
-		price: gold.price + 1_500_000,
-		package: gold,
+		// Two packages: the lamaran and the wedding
+		price: lamaran.price + gold.price + 1_500_000,
+		packages: [lamaran, gold],
 		addons: [{ name: 'Same Day Edit', unitPrice: 1_500_000 }],
 		sessions: [
+			{ eventType: 'engagement', offset: 20, venue: 'Rumah mempelai wanita', start: '10:00' },
 			{ eventType: 'akad', offset: 60, venue: 'Masjid Raya Bogor', start: '08:00' },
 			{ eventType: 'resepsi', offset: 60, venue: 'Gedung Kujang', start: '11:00' }
 		]
@@ -136,7 +139,7 @@ const DEMOS: Demo[] = [
 		eventType: 'wedding',
 		stage: 'booked',
 		price: silver.price,
-		package: silver,
+		packages: [silver],
 		bookedDaysAgo: 10,
 		sessions: [
 			{ eventType: 'akad', offset: 21, venue: 'Pullman Bandung', start: '08:00' },
@@ -149,7 +152,7 @@ const DEMOS: Demo[] = [
 		eventType: 'wedding',
 		stage: 'preparation',
 		price: gold.price + 2 * 750_000,
-		package: gold,
+		packages: [gold],
 		addons: [{ name: 'Reels tambahan', unitPrice: 750_000, qty: 2 }],
 		bookedDaysAgo: 40,
 		sessions: [
@@ -164,7 +167,7 @@ const DEMOS: Demo[] = [
 		eventType: 'akad',
 		stage: 'event_day',
 		price: silver.price,
-		package: silver,
+		packages: [silver],
 		bookedDaysAgo: 60,
 		sessions: [{ eventType: 'akad', offset: 0, venue: 'Masjid Pusdai', start: '09:00' }]
 	},
@@ -180,7 +183,7 @@ const DEMOS: Demo[] = [
 		eventType: 'wedding',
 		stage: 'editing',
 		price: gold.price,
-		package: gold,
+		packages: [gold],
 		bookedDaysAgo: 90,
 		sessions: [{ eventType: 'resepsi', offset: -7, venue: 'Royal Ambarrukmo', start: '18:00' }]
 	},
@@ -199,7 +202,7 @@ const DEMOS: Demo[] = [
 		eventType: 'wedding',
 		stage: 'lost',
 		price: silver.price,
-		package: silver,
+		packages: [silver],
 		lostReason: 'Memilih vendor lain (budget)',
 		sessions: [{ eventType: 'resepsi', offset: 50 }]
 	},
@@ -286,7 +289,6 @@ try {
 					clientId,
 					title: d.title,
 					eventType: d.eventType,
-					packageSnapshot: d.package ?? null,
 					agreedPrice: d.price,
 					stage: d.stage,
 					position: key(n),
@@ -308,6 +310,11 @@ try {
 					sort: i
 				}))
 			);
+
+			if (d.packages?.length)
+				await tx
+					.insert(bookingPackage)
+					.values(d.packages.map((p, sort) => ({ bookingId: b.id, ...p, sort })));
 
 			if (d.addons?.length)
 				await tx.insert(bookingAddon).values(

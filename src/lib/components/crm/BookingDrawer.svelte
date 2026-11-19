@@ -50,6 +50,15 @@
 		venue: string;
 		city: string;
 	};
+	/** lineId = already on the saved booking (its snapshot price is kept) */
+	type PackageRow = {
+		key: number;
+		lineId: string | null;
+		packageId: string | null;
+		name: string;
+		category: string | null;
+		price: number;
+	};
 	type AddonRow = {
 		key: number;
 		addonId: string | null;
@@ -82,7 +91,7 @@
 	let title = $state('');
 	let eventType = $state<EventType>('wedding');
 	let stage = $state<'inquiry' | 'consultation' | 'quotation'>('inquiry');
-	let packageId = $state('');
+	let packages = $state<PackageRow[]>([]);
 	let sessions = $state<SessionRow[]>([newSession()]);
 	let addons = $state<AddonRow[]>([]);
 	let agreedPrice = $state<number | null>(0);
@@ -90,8 +99,6 @@
 	let crewIds = $state<string[]>([]);
 	/** Crew already on the saved booking: shown even when deactivated since */
 	let savedCrew = $state<string[]>([]);
-	/** Package of the saved booking and its snapshot price (site price changes don't apply) */
-	let savedPackage = $state<{ id: string | null; price: number | null }>({ id: null, price: null });
 	let sameDate = $state<Record<string, { id: string; title: string }[]>>({});
 
 	const err = (k: string) => (errors[k] ? [errors[k]] : undefined);
@@ -109,14 +116,13 @@
 		title = '';
 		eventType = 'wedding';
 		stage = 'inquiry';
-		packageId = '';
+		packages = [];
 		sessions = [newSession()];
 		addons = [];
 		agreedPrice = 0;
 		notes = '';
 		crewIds = [];
 		savedCrew = [];
-		savedPackage = { id: null, price: null };
 		sameDate = {};
 	}
 
@@ -130,8 +136,7 @@
 			clientLabel = b.clientName;
 			title = b.title;
 			eventType = b.eventType;
-			packageId = b.packageId ?? '';
-			savedPackage = { id: b.packageId, price: b.packageSnapshot?.price ?? null };
+			packages = b.packages.map((p: Omit<PackageRow, 'key'>) => ({ ...p, key: ++rowKey }));
 			sessions = b.sessions.length
 				? b.sessions.map((s: Record<string, string | null>) => ({
 						key: ++rowKey,
@@ -183,17 +188,31 @@
 		clientQuery = '';
 	}
 
-	// ---------- price = package + add-ons (editable; recalculated when either changes) ----------
-	const packagePrice = $derived.by(() => {
-		if (!packageId) return 0;
-		if (packageId === savedPackage.id && savedPackage.price !== null) return savedPackage.price;
-		return options.packages.find((p) => p.id === packageId)?.price ?? 0;
-	});
+	// ---------- price = packages + add-ons (editable; recalculated when either changes) ----------
+	const packagePrice = $derived(packages.reduce((sum, p) => sum + p.price, 0));
+	/** Packages not on the booking yet (the same package twice is refused) */
+	const packageChoices = $derived(
+		options.packages.filter((o) => !packages.some((p) => p.packageId === o.id))
+	);
 	const addonsTotal = $derived(
 		addons.reduce((sum, a) => sum + (a.unitPrice ?? 0) * Math.max(1, a.qty || 1), 0)
 	);
 	const computed = $derived(packagePrice + addonsTotal);
 	const recompute = () => (agreedPrice = packagePrice + addonsTotal);
+
+	function addPackage(id: string) {
+		const p = options.packages.find((x) => x.id === id);
+		if (!p) return;
+		packages.push({
+			key: ++rowKey,
+			lineId: null,
+			packageId: p.id,
+			name: p.name,
+			category: p.category,
+			price: p.price
+		});
+		queueMicrotask(recompute);
+	}
 
 	function addAddon(id: string) {
 		if (id === 'custom') {
@@ -254,6 +273,9 @@
 			}))
 		)
 	);
+	const packagesJson = $derived(
+		JSON.stringify(packages.map(({ lineId, packageId }) => ({ lineId, packageId })))
+	);
 	const addonsJson = $derived(
 		JSON.stringify(
 			addons.map(({ addonId, name, unitPrice, qty }) => ({
@@ -300,6 +322,7 @@
 		>
 			{#if isEdit}<input type="hidden" name="id" value={bookingId} />{/if}
 			<input type="hidden" name="sessions" value={sessionsJson} />
+			<input type="hidden" name="packages" value={packagesJson} />
 			<input type="hidden" name="addons" value={addonsJson} />
 			<input type="hidden" name="crewIds" value={JSON.stringify(crewIds)} />
 
@@ -641,33 +664,72 @@
 					</p>{/if}
 			</div>
 
-			<!-- Package + add-ons + price -->
-			<Field label="Paket" name="packageId" errors={err('packageId')}>
-				{#snippet children(attrs)}
-					<select
-						{...attrs}
-						class="input"
-						bind:value={packageId}
-						onchange={() => queueMicrotask(recompute)}
-					>
-						<option value="">Tanpa paket</option>
-						{#each options.packages as p (p.id)}
-							<option value={p.id}
-								>{p.category} · {p.name} · {rupiah(p.price)}{p.visible
-									? ''
-									: ' (tersembunyi)'}</option
+			<!-- Packages (one or more) + add-ons + price -->
+			<fieldset class="flex flex-col gap-2">
+				<legend class="mb-1 font-semibold">Paket</legend>
+				{#if errors.packages}<p class="field__error">{errors.packages}</p>{/if}
+				{#if packages.length}
+					<ul class="flex flex-col gap-2" aria-label="Paket dipilih">
+						{#each packages as p, i (p.key)}
+							<li
+								class="flex items-center justify-between gap-3 rounded-card border border-line px-3 py-2"
 							>
+								<span class="min-w-0">
+									<span class="font-semibold">{p.name}</span>
+									{#if p.category}<span class="text-small text-ink-2"> · {p.category}</span>{/if}
+								</span>
+								<span class="flex shrink-0 items-center gap-1">
+									<span class="tabular-nums">{rupiah(p.price)}</span>
+									<button
+										type="button"
+										class="icon-btn"
+										aria-label="Hapus paket {p.name}"
+										onclick={() => {
+											packages.splice(i, 1);
+											queueMicrotask(recompute);
+										}}
+									>
+										<Trash2 size={16} aria-hidden="true" />
+									</button>
+								</span>
+							</li>
 						{/each}
-					</select>
-				{/snippet}
-			</Field>
-			{#if !options.packages.length}
-				<p class="-mt-3 text-small text-ink-2">
-					Belum ada paket. Tambahkan di <a class="underline" href={resolve('admin/konten/paket')}
-						>Konten → Paket</a
-					>.
-				</p>
-			{/if}
+					</ul>
+				{/if}
+				{#if options.packages.length}
+					<div class="field">
+						<label for="booking-add-package" class="sr-only">Tambah paket</label>
+						<select
+							id="booking-add-package"
+							class="input"
+							value=""
+							disabled={!packageChoices.length}
+							onchange={(e) => {
+								const v = e.currentTarget.value;
+								e.currentTarget.value = '';
+								if (v) addPackage(v);
+							}}
+						>
+							<option value=""
+								>{packages.length ? '+ Tambah paket lain…' : '+ Tambah paket…'}</option
+							>
+							{#each packageChoices as p (p.id)}
+								<option value={p.id}
+									>{p.category} · {p.name} · {rupiah(p.price)}{p.visible
+										? ''
+										: ' (tersembunyi)'}</option
+								>
+							{/each}
+						</select>
+					</div>
+				{:else}
+					<p class="text-small text-ink-2">
+						Belum ada paket. Tambahkan di <a class="underline" href={resolve('admin/konten/paket')}
+							>Konten → Paket</a
+						>.
+					</p>
+				{/if}
+			</fieldset>
 
 			<fieldset class="flex flex-col gap-2">
 				<legend class="mb-1 font-semibold">Add-on</legend>

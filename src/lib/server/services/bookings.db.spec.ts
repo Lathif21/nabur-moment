@@ -9,6 +9,7 @@ import {
 	addon,
 	booking,
 	bookingAddon,
+	bookingPackage,
 	bookingSession,
 	client,
 	packageCategory,
@@ -111,7 +112,7 @@ describe('bookingSchema', () => {
 });
 
 describe.runIf(isDevDb)('bookings service', () => {
-	it('creates a booking with an inline client, sessions, add-ons and a package snapshot', () =>
+	it('creates a booking with an inline client, sessions, add-ons and package snapshots', () =>
 		inRollback(async (tx) => {
 			const [cat] = await tx
 				.insert(packageCategory)
@@ -127,6 +128,10 @@ describe.runIf(isDevDb)('bookings service', () => {
 					position: 'a0'
 				})
 				.returning();
+			const [p2] = await tx
+				.insert(pkg)
+				.values({ categoryId: cat.id, name: 'E2E Lamaran', price: 3_000_000, position: 'a1' })
+				.returning();
 			const [a] = await tx
 				.insert(addon)
 				.values({ name: 'E2E SDE', price: 500_000, position: 'a0' })
@@ -135,7 +140,8 @@ describe.runIf(isDevDb)('bookings service', () => {
 			const made = await createBooking(
 				tx,
 				input({
-					packageId: p.id,
+					agreedPrice: '12500000',
+					packages: JSON.stringify([{ packageId: p.id }, { packageId: p2.id }]),
 					addons: JSON.stringify([
 						{ addonId: a.id, name: 'E2E SDE', unitPrice: 500_000, qty: 1 },
 						{ addonId: null, name: 'Drone', unitPrice: 0, qty: 2 }
@@ -144,25 +150,43 @@ describe.runIf(isDevDb)('bookings service', () => {
 				null
 			);
 			const b = await getBookingForEdit(tx, made.id);
-			expect(b).toMatchObject({
-				stage: 'inquiry',
-				agreedPrice: 9_500_000,
-				packageSnapshot: {
-					name: 'E2E Gold',
-					price: 9_000_000,
-					inclusions: ['2 videografer'],
-					category: 'E2E CRM Cat'
-				}
-			});
+			expect(b).toMatchObject({ stage: 'inquiry', agreedPrice: 12_500_000 });
+			expect(b!.packages).toMatchObject([
+				{ packageId: p.id, name: 'E2E Gold', price: 9_000_000, category: 'E2E CRM Cat' },
+				{ packageId: p2.id, name: 'E2E Lamaran', price: 3_000_000 }
+			]);
+			const [gold] = await tx
+				.select()
+				.from(bookingPackage)
+				.where(eq(bookingPackage.id, b!.packages[0].lineId));
+			expect(gold.inclusions).toEqual(['2 videografer']);
 			// Sessions come back in date order (akad first = Hari H)
 			expect(b!.sessions.map((s) => s.date)).toEqual([D1, D2]);
 			expect(b!.addons).toHaveLength(2);
 
-			// Site edits don't change the booking; an edit that keeps the package keeps the snapshot
+			// Site edits don't change the booking; an edit that keeps a package row keeps its snapshot,
+			// a package removed from the form leaves the booking
 			await tx.update(pkg).set({ price: 1 }).where(eq(pkg.id, p.id));
-			await updateBooking(tx, made.id, input({ clientId: made.clientId, packageId: p.id }), null);
-			expect((await getBookingForEdit(tx, made.id))!.packageSnapshot?.price).toBe(9_000_000);
-			expect((await getBookingForEdit(tx, made.id))!.addons).toHaveLength(0);
+			const kept = JSON.stringify([{ lineId: b!.packages[0].lineId }]);
+			await updateBooking(tx, made.id, input({ clientId: made.clientId, packages: kept }), null);
+			const edited = (await getBookingForEdit(tx, made.id))!;
+			expect(edited.packages).toMatchObject([{ packageId: p.id, price: 9_000_000 }]);
+			expect(edited.addons).toHaveLength(0);
+			// Picking it again next to the kept row is refused; a newly picked one takes the live price
+			const twice = JSON.stringify([{ lineId: edited.packages[0].lineId }, { packageId: p.id }]);
+			await rejects(
+				updateBooking(tx, made.id, input({ clientId: made.clientId, packages: twice }), null),
+				'packages'
+			);
+			const fresh = JSON.stringify([{ packageId: p.id }]);
+			await updateBooking(tx, made.id, input({ clientId: made.clientId, packages: fresh }), null);
+			expect((await getBookingForEdit(tx, made.id))!.packages).toMatchObject([{ price: 1 }]);
+			// A row id from another booking is refused
+			const other = await createBooking(tx, input({ newClientPhone: '0899-7002-0009' }), null);
+			await rejects(
+				updateBooking(tx, other.id, input({ clientId: other.clientId, packages: kept }), null),
+				'packages'
+			);
 
 			// Inline client with a WhatsApp that already exists is refused
 			await rejects(createBooking(tx, input(), null), 'newClientPhone');
@@ -290,12 +314,17 @@ describe.runIf(isDevDb)('bookings service', () => {
 				.insert(pkg)
 				.values({ categoryId: cat.id, name: 'E2E Silver', price: 6_500_000, position: 'a0' })
 				.returning();
+			const [p2] = await tx
+				.insert(pkg)
+				.values({ categoryId: cat.id, name: 'E2E Prewed', price: 2_500_000, position: 'a1' })
+				.returning();
 
 			const { id } = await createInquiryBooking(tx, {
 				clientId: c.id,
 				title: 'E2E CRM Inquiry',
 				eventType: 'wedding',
-				packageId: p.id,
+				// Several ticked, one twice and one unknown: the unknown one is dropped
+				packageIds: [p.id, p2.id, p.id, '00000000-0000-0000-0000-000000000000'],
 				message: 'Halo kak',
 				sessionDate: D1,
 				venue: 'Gedung Sate',
@@ -306,10 +335,20 @@ describe.runIf(isDevDb)('bookings service', () => {
 				stage: 'inquiry',
 				origin: 'website_form',
 				inquiryMessage: 'Halo kak',
-				agreedPrice: 6_500_000,
-				packageId: p.id,
-				packageSnapshot: { name: 'E2E Silver', price: 6_500_000, category: 'E2E CRM Cat' }
+				agreedPrice: 9_000_000
 			});
+			const lines = await tx
+				.select()
+				.from(bookingPackage)
+				.where(eq(bookingPackage.bookingId, id))
+				.orderBy(asc(bookingPackage.sort));
+			expect(lines).toMatchObject([
+				{ packageId: p.id, name: 'E2E Silver', price: 6_500_000, category: 'E2E CRM Cat' },
+				{ packageId: p2.id, name: 'E2E Prewed', price: 2_500_000 }
+			]);
+			expect((await listBoard(tx)).find((x) => x.id === id)?.packageNames).toBe(
+				'E2E Silver + E2E Prewed'
+			);
 			const sessions = await tx
 				.select()
 				.from(bookingSession)
@@ -322,15 +361,18 @@ describe.runIf(isDevDb)('bookings service', () => {
 			// On top of Inquiry
 			expect((await listBoard(tx)).find((x) => x.stage === 'inquiry')?.id).toBe(id);
 
-			// Unknown package and no date: still saved, one undated session, no snapshot
+			// Unknown package and no date: still saved, one undated session, no package
 			const second = await createInquiryBooking(tx, {
 				clientId: c.id,
 				title: 'E2E CRM Inquiry 2',
 				eventType: 'akad',
-				packageId: '00000000-0000-0000-0000-000000000000'
+				packageIds: ['00000000-0000-0000-0000-000000000000']
 			});
 			const [b2] = await tx.select().from(booking).where(eq(booking.id, second.id));
-			expect(b2).toMatchObject({ packageId: null, packageSnapshot: null, agreedPrice: 0 });
+			expect(b2).toMatchObject({ agreedPrice: 0 });
+			expect(
+				await tx.select().from(bookingPackage).where(eq(bookingPackage.bookingId, second.id))
+			).toEqual([]);
 			const s2 = await tx
 				.select()
 				.from(bookingSession)

@@ -20,6 +20,7 @@ import { createBooking, moveBooking } from './bookings';
 import { ServiceError } from './errors';
 import { listSchedule } from './installments';
 import {
+	bookingContractLines,
 	createCustomInvoice,
 	createInstallmentInvoice,
 	getInvoice,
@@ -154,6 +155,16 @@ describe.runIf(isDevDb)('invoices', () => {
 					position: 'a0'
 				})
 				.returning();
+			const [lamaran] = await tx
+				.insert(pkg)
+				.values({
+					categoryId: cat.id,
+					name: 'Lamaran Spec',
+					price: 2_000_000,
+					inclusions: ['1 fotografer'],
+					position: 'a1'
+				})
+				.returning();
 			const [drone] = await tx
 				.insert(addon)
 				.values({
@@ -166,7 +177,9 @@ describe.runIf(isDevDb)('invoices', () => {
 			const made = await createBooking(
 				tx,
 				bookingInput('0899-7006-0009', {
-					packageId: gold.id,
+					// Two packages: one line each, in the order picked
+					packages: JSON.stringify([{ packageId: gold.id }, { packageId: lamaran.id }]),
+					agreedPrice: '12000000',
 					addons: JSON.stringify([
 						{ addonId: drone.id, name: 'Drone', unitPrice: 1_000_000, qty: 1 },
 						{ addonId: null, name: 'Cetak kanvas', unitPrice: 0, qty: 1 }
@@ -188,6 +201,12 @@ describe.runIf(isDevDb)('invoices', () => {
 					details: ['2 fotografer', 'Album 30 halaman']
 				},
 				{
+					description: 'Paket Lamaran Spec',
+					qty: 1,
+					unitPrice: 2_000_000,
+					details: ['1 fotografer']
+				},
+				{
 					description: 'Add-on: Drone',
 					qty: 1,
 					unitPrice: 1_000_000,
@@ -195,6 +214,26 @@ describe.runIf(isDevDb)('invoices', () => {
 				},
 				// A line typed on the booking has no description
 				{ description: 'Add-on: Cetak kanvas', qty: 1, unitPrice: 0 }
+			]);
+
+			// Price edited by hand: one line, each package's inclusions under its name
+			await tx.update(booking).set({ agreedPrice: 11_500_000 }).where(eq(booking.id, made.id));
+			expect(await bookingContractLines(tx, made.id)).toEqual([
+				{
+					description:
+						'Paket Gold Spec + Lamaran Spec + add-on (E2E CRM Invoice), harga disepakati',
+					qty: 1,
+					unitPrice: 11_500_000,
+					details: [
+						'Paket Gold Spec',
+						'– 2 fotografer',
+						'– Album 30 halaman',
+						'Paket Lamaran Spec',
+						'– 1 fotografer',
+						'Add-on: Drone',
+						'Add-on: Cetak kanvas'
+					]
+				}
 			]);
 		}));
 

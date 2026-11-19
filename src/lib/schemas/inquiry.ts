@@ -39,11 +39,12 @@ export const inquirySchema = z.object({
 		.transform((v) => v || null),
 	venue: optional(120),
 	city: optional(80),
-	/** A package id from /paket, or "belum" (not sure yet) */
-	packageId: z
-		.string()
-		.default('')
-		.transform((v) => (z.uuid().safeParse(v).success ? v : null)),
+	/** Packages ticked on the form (none = not sure yet); anything that isn't an id is dropped */
+	packageIds: z
+		.array(z.string())
+		.max(30)
+		.default([])
+		.transform((ids) => [...new Set(ids.filter((v) => z.uuid().safeParse(v).success))]),
 	sourceId: z
 		.string()
 		.default('')

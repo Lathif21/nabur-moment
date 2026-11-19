@@ -8,11 +8,11 @@ import {
 	addon,
 	booking,
 	bookingAddon,
+	bookingPackage,
 	bookingSession,
 	client,
 	packageCategory,
-	pkg,
-	type PackageSnapshot
+	pkg
 } from '../db/schema/index.ts';
 import { BOOKED_STAGES, STAGE_LABEL, type EventType, type Stage } from '../../crm.ts';
 import { dayKeyWib, rupiah } from '../../format.ts';
@@ -20,7 +20,8 @@ import type {
 	BookingFilter,
 	BookingInput,
 	BookingMoveInput,
-	DeliveryInput
+	DeliveryInput,
+	PackageLineInput
 } from '../../schemas/crm.ts';
 import { findClientByPhone } from './clients.ts';
 import { crewByBooking, crewOptions, setBookingCrew } from './crew.ts';
@@ -91,6 +92,11 @@ const firstDateSql = sql<
 	string | null
 >`(select min(bs.date)::text from "booking_session" bs where bs.booking_id = "booking"."id")`;
 
+/** Package names of the booking joined with " + " (null without a package) */
+const packageNamesSql = sql<
+	string | null
+>`(select string_agg(bp.name, ' + ' order by bp.sort) from "booking_package" bp where bp.booking_id = "booking"."id")`;
+
 /** Next session from `today` on; falls back to the latest past one */
 const nextDateSql = (today: string) =>
 	sql<
@@ -108,7 +114,7 @@ export async function listBoard(db: DbOrTx, today = dayKeyWib()) {
 			eventType: booking.eventType,
 			agreedPrice: booking.agreedPrice,
 			bookedAt: booking.bookedAt,
-			packageName: sql<string | null>`${booking.packageSnapshot}->>'name'`,
+			packageNames: packageNamesSql,
 			clientId: booking.clientId,
 			clientName: client.name,
 			nextDate: nextDateSql(today),
@@ -153,7 +159,7 @@ export async function listBookings(db: DbOrTx, filter: Partial<BookingFilter> = 
 			eventType: booking.eventType,
 			agreedPrice: booking.agreedPrice,
 			bookedAt: booking.bookedAt,
-			packageName: sql<string | null>`${booking.packageSnapshot}->>'name'`,
+			packageNames: packageNamesSql,
 			clientId: booking.clientId,
 			clientName: client.name,
 			firstDate: firstDateSql,
@@ -204,8 +210,6 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 			eventType: booking.eventType,
 			clientId: booking.clientId,
 			clientName: client.name,
-			packageId: booking.packageId,
-			packageSnapshot: booking.packageSnapshot,
 			agreedPrice: booking.agreedPrice,
 			bookedAt: booking.bookedAt,
 			notes: booking.notes
@@ -214,7 +218,7 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 		.innerJoin(client, eq(client.id, booking.clientId))
 		.where(eq(booking.id, id));
 	if (!row) return null;
-	const [sessions, addons, crew] = await Promise.all([
+	const [sessions, packages, addons, crew] = await Promise.all([
 		db
 			.select({
 				eventType: bookingSession.eventType,
@@ -230,6 +234,17 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 			.orderBy(sql`${bookingSession.date} asc nulls last`, asc(bookingSession.sort)),
 		db
 			.select({
+				lineId: bookingPackage.id,
+				packageId: bookingPackage.packageId,
+				name: bookingPackage.name,
+				price: bookingPackage.price,
+				category: bookingPackage.category
+			})
+			.from(bookingPackage)
+			.where(eq(bookingPackage.bookingId, id))
+			.orderBy(asc(bookingPackage.sort)),
+		db
+			.select({
 				addonId: bookingAddon.addonId,
 				name: bookingAddon.name,
 				unitPrice: bookingAddon.unitPrice,
@@ -240,12 +255,27 @@ export async function getBookingForEdit(db: DbOrTx, id: string) {
 			.orderBy(asc(bookingAddon.createdAt)),
 		crewByBooking(db, [id])
 	]);
-	return { ...row, sessions, addons, crewIds: (crew[id] ?? []).map((c) => c.id) };
+	return { ...row, sessions, packages, addons, crewIds: (crew[id] ?? []).map((c) => c.id) };
 }
 
 export type BookingForEdit = NonNullable<Awaited<ReturnType<typeof getBookingForEdit>>>;
 
-/** Booking page (03-SCREENS B4): the booking, its client's contacts, sessions and add-on lines */
+/** The booking's packages (snapshots) in the order picked */
+export async function bookingPackageLines(db: DbOrTx, bookingId: string) {
+	return db
+		.select({
+			id: bookingPackage.id,
+			name: bookingPackage.name,
+			price: bookingPackage.price,
+			inclusions: bookingPackage.inclusions,
+			category: bookingPackage.category
+		})
+		.from(bookingPackage)
+		.where(eq(bookingPackage.bookingId, bookingId))
+		.orderBy(asc(bookingPackage.sort));
+}
+
+/** Booking page (03-SCREENS B4): the booking, its client's contacts, sessions, packages and add-ons */
 export async function getBookingDetail(db: DbOrTx, id: string) {
 	const [row] = await db
 		.select({
@@ -256,7 +286,6 @@ export async function getBookingDetail(db: DbOrTx, id: string) {
 			origin: booking.origin,
 			inquiryMessage: booking.inquiryMessage,
 			lostReason: booking.lostReason,
-			packageSnapshot: booking.packageSnapshot,
 			agreedPrice: booking.agreedPrice,
 			bookedAt: booking.bookedAt,
 			stageChangedAt: booking.stageChangedAt,
@@ -278,7 +307,7 @@ export async function getBookingDetail(db: DbOrTx, id: string) {
 		.innerJoin(client, eq(client.id, booking.clientId))
 		.where(eq(booking.id, id));
 	if (!row) return null;
-	const [sessions, addons, crew] = await Promise.all([
+	const [sessions, packages, addons, crew] = await Promise.all([
 		db
 			.select({
 				id: bookingSession.id,
@@ -293,6 +322,7 @@ export async function getBookingDetail(db: DbOrTx, id: string) {
 			.from(bookingSession)
 			.where(eq(bookingSession.bookingId, id))
 			.orderBy(sql`${bookingSession.date} asc nulls last`, asc(bookingSession.sort)),
+		bookingPackageLines(db, id),
 		db
 			.select({
 				id: bookingAddon.id,
@@ -305,7 +335,7 @@ export async function getBookingDetail(db: DbOrTx, id: string) {
 			.orderBy(asc(bookingAddon.createdAt)),
 		crewByBooking(db, [id])
 	]);
-	return { ...row, sessions, addons, crew: crew[id] ?? [] };
+	return { ...row, sessions, packages, addons, crew: crew[id] ?? [] };
 }
 
 export type BookingDetail = NonNullable<Awaited<ReturnType<typeof getBookingDetail>>>;
@@ -342,9 +372,20 @@ export async function bookingFormOptions(db: DbOrTx) {
 
 // ---------- writes ----------
 
-async function packageSnapshot(db: DbOrTx, packageId: string): Promise<PackageSnapshot> {
-	const [p] = await db
+type PackageSnapshot = {
+	packageId: string | null;
+	name: string;
+	price: number;
+	inclusions: string[];
+	category: string | null;
+};
+
+/** Name, price, inclusions and category of live packages, to copy onto a booking */
+async function packageSnapshots(db: DbOrTx, ids: string[]): Promise<Map<string, PackageSnapshot>> {
+	if (!ids.length) return new Map();
+	const rows = await db
 		.select({
+			packageId: pkg.id,
 			name: pkg.name,
 			price: pkg.price,
 			inclusions: pkg.inclusions,
@@ -352,9 +393,51 @@ async function packageSnapshot(db: DbOrTx, packageId: string): Promise<PackageSn
 		})
 		.from(pkg)
 		.innerJoin(packageCategory, eq(packageCategory.id, pkg.categoryId))
-		.where(eq(pkg.id, packageId));
-	if (!p) throw new ServiceError('Paket tidak ditemukan.', 'packageId');
-	return p;
+		.where(inArray(pkg.id, ids));
+	return new Map(rows.map((r) => [r.packageId, r]));
+}
+
+/**
+ * The booking's packages as they will be saved: rows already on the booking keep their snapshot
+ * (site price changes don't apply), newly picked packages get a fresh one.
+ */
+async function resolvePackages(
+	db: DbOrTx,
+	bookingId: string | null,
+	rows: PackageLineInput[]
+): Promise<PackageSnapshot[]> {
+	const existing = bookingId
+		? await db
+				.select({
+					id: bookingPackage.id,
+					packageId: bookingPackage.packageId,
+					name: bookingPackage.name,
+					price: bookingPackage.price,
+					inclusions: bookingPackage.inclusions,
+					category: bookingPackage.category
+				})
+				.from(bookingPackage)
+				.where(eq(bookingPackage.bookingId, bookingId))
+		: [];
+	const live = await packageSnapshots(
+		db,
+		rows.filter((r) => !r.lineId).map((r) => r.packageId!)
+	);
+	const out = rows.map((r) => {
+		const snap = r.lineId ? existing.find((e) => e.id === r.lineId) : live.get(r.packageId!);
+		if (!snap) throw new ServiceError('Paket tidak ditemukan.', 'packages');
+		const { packageId, name, price, inclusions, category } = snap;
+		return { packageId, name, price, inclusions, category };
+	});
+	const ids = out.map((p) => p.packageId).filter(Boolean);
+	if (new Set(ids).size !== ids.length)
+		throw new ServiceError('Paket yang sama dipilih dua kali.', 'packages');
+	return out;
+}
+
+async function insertPackages(db: DbOrTx, bookingId: string, packages: PackageSnapshot[]) {
+	if (packages.length)
+		await db.insert(bookingPackage).values(packages.map((p, sort) => ({ bookingId, ...p, sort })));
 }
 
 /** Existing client, or the inline new one (refused when the WhatsApp already belongs to someone) */
@@ -408,8 +491,8 @@ export type InquiryBookingInput = {
 	clientId: string;
 	title: string;
 	eventType: EventType;
-	/** From `?paket=`; an unknown or deleted package is ignored, never an error for a visitor */
-	packageId?: string | null;
+	/** Ticked on the form (or `?paket=`); unknown or deleted ones are ignored, never an error for a visitor */
+	packageIds?: string[];
 	message?: string | null;
 	/** "Tanggal acara (utama)" (yyyy-MM-dd); becomes the first session */
 	sessionDate?: string | null;
@@ -419,20 +502,13 @@ export type InquiryBookingInput = {
 
 /**
  * Booking for a website inquiry (P1-08): Inquiry column top, origin `website_form`, package
- * snapshot, one session (dated when the form gave a date) and a system activity. Runs on the
+ * snapshots (price = their sum), one session (dated when the form gave a date) and a system activity. Runs on the
  * caller's transaction, so the client match / create and this insert commit together.
  */
 export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInput) {
-	let snapshot: PackageSnapshot | null = null;
-	let packageId: string | null = null;
-	if (input.packageId) {
-		try {
-			snapshot = await packageSnapshot(db, input.packageId);
-			packageId = input.packageId;
-		} catch (e) {
-			if (!(e instanceof ServiceError)) throw e;
-		}
-	}
+	const wanted = [...new Set(input.packageIds ?? [])];
+	const found = await packageSnapshots(db, wanted);
+	const packages = wanted.map((id) => found.get(id)).filter((p) => !!p);
 	const now = new Date();
 	const [row] = await db
 		.insert(booking)
@@ -440,9 +516,7 @@ export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInpu
 			clientId: input.clientId,
 			title: input.title,
 			eventType: input.eventType,
-			packageId,
-			packageSnapshot: snapshot,
-			agreedPrice: snapshot?.price ?? 0,
+			agreedPrice: packages.reduce((sum, p) => sum + p.price, 0),
 			stage: 'inquiry',
 			position: await topOf(db, 'inquiry'),
 			origin: 'website_form',
@@ -450,6 +524,7 @@ export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInpu
 			stageChangedAt: now
 		})
 		.returning({ id: booking.id });
+	await insertPackages(db, row.id, packages);
 	await db.insert(bookingSession).values({
 		bookingId: row.id,
 		eventType: input.eventType,
@@ -470,12 +545,12 @@ export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInpu
 	return { id: row.id };
 }
 
-/** New booking at the top of its column, with sessions, add-ons and a package snapshot */
+/** New booking at the top of its column, with sessions, package snapshots and add-ons */
 export async function createBooking(db: DbOrTx, input: BookingInput, userId: string | null) {
 	return db.transaction(async (tx) => {
 		const clientId = await resolveClient(tx, input, userId);
 		await assertAddons(tx, input);
-		const snapshot = input.packageId ? await packageSnapshot(tx, input.packageId) : null;
+		const packages = await resolvePackages(tx, null, input.packages);
 		const now = new Date();
 		const [row] = await tx
 			.insert(booking)
@@ -483,8 +558,6 @@ export async function createBooking(db: DbOrTx, input: BookingInput, userId: str
 				clientId,
 				title: input.title,
 				eventType: input.eventType,
-				packageId: input.packageId,
-				packageSnapshot: snapshot,
 				agreedPrice: input.agreedPrice,
 				stage: input.stage,
 				position: await topOf(tx, input.stage),
@@ -493,6 +566,7 @@ export async function createBooking(db: DbOrTx, input: BookingInput, userId: str
 				stageChangedAt: now
 			})
 			.returning({ id: booking.id });
+		await insertPackages(tx, row.id, packages);
 		await writeLines(tx, row.id, input);
 		await setBookingCrew(tx, row.id, input.crewIds);
 		await ensureSchedule(tx, row.id);
@@ -509,8 +583,8 @@ export async function createBooking(db: DbOrTx, input: BookingInput, userId: str
 }
 
 /**
- * Edit everything except the stage (moves go through moveBooking). Sessions, add-on lines and
- * crew are replaced. The package snapshot is kept unless another package is picked.
+ * Edit everything except the stage (moves go through moveBooking). Sessions, packages, add-on
+ * lines and crew are replaced; packages already on the booking keep their snapshot.
  */
 export async function updateBooking(
 	db: DbOrTx,
@@ -520,36 +594,31 @@ export async function updateBooking(
 ) {
 	return db.transaction(async (tx) => {
 		const [current] = await tx
-			.select({ packageId: booking.packageId, packageSnapshot: booking.packageSnapshot })
+			.select({ id: booking.id })
 			.from(booking)
 			.where(eq(booking.id, id))
 			.for('update');
 		if (!current) throw new ServiceError('Booking tidak ditemukan.');
 		const clientId = await resolveClient(tx, input, userId);
 		await assertAddons(tx, input);
-		const snapshot =
-			input.packageId === current.packageId
-				? current.packageSnapshot
-				: input.packageId
-					? await packageSnapshot(tx, input.packageId)
-					: null;
+		const packages = await resolvePackages(tx, id, input.packages);
 		await tx
 			.update(booking)
 			.set({
 				clientId,
 				title: input.title,
 				eventType: input.eventType,
-				packageId: input.packageId,
-				packageSnapshot: snapshot,
 				agreedPrice: input.agreedPrice,
 				notes: input.notes
 			})
 			.where(eq(booking.id, id));
 		await tx.delete(bookingSession).where(eq(bookingSession.bookingId, id));
 		await tx.delete(bookingAddon).where(eq(bookingAddon.bookingId, id));
+		await tx.delete(bookingPackage).where(eq(bookingPackage.bookingId, id));
+		await insertPackages(tx, id, packages);
 		await writeLines(tx, id, input);
 		await setBookingCrew(tx, id, input.crewIds);
-		// price, add-ons or sessions may have changed: DP / pelunasan amounts and due date
+		// price, packages, add-ons or sessions may have changed: DP / pelunasan amounts and due date
 		await ensureSchedule(tx, id);
 		return { id, clientId };
 	});

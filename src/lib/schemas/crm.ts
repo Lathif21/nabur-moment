@@ -135,7 +135,18 @@ export const addonLineSchema = z.object({
 	qty: z.number().int().min(1, 'Jumlah minimal 1.').max(99)
 });
 
-/** JSON posted in a hidden field (sessions / add-on rows) */
+/**
+ * A package row in the booking form: `lineId` = a package already on the booking (its snapshot is
+ * kept, even when the package was deleted since); otherwise `packageId` = a package picked now.
+ */
+export const packageLineSchema = z
+	.object({
+		lineId: z.uuid().nullable().default(null),
+		packageId: z.uuid().nullable().default(null)
+	})
+	.refine((p) => p.lineId || p.packageId, 'Pilih paket.');
+
+/** JSON posted in a hidden field (sessions / package / add-on rows) */
 const jsonArray = <T extends z.ZodType>(item: T) =>
 	z
 		.string()
@@ -176,11 +187,11 @@ export const bookingSchema = z
 		title: z.string().trim().min(1, 'Judul wajib diisi.').max(160),
 		eventType: z.enum(EVENT_TYPE_KEYS, 'Pilih jenis acara.'),
 		stage: z.enum(OPEN_STAGE_KEYS).default('inquiry'),
-		packageId: z
-			.string()
-			.default('')
-			.transform((v) => v || null)
-			.pipe(z.uuid().nullable()),
+		/** One or more packages (or none), in the order shown */
+		packages: jsonArray(packageLineSchema).refine((rows) => {
+			const ids = rows.map((r) => r.packageId).filter(Boolean);
+			return new Set(ids).size === ids.length;
+		}, 'Paket yang sama dipilih dua kali.'),
 		agreedPrice: z.coerce
 			.number('Harga tidak valid.')
 			.int('Harga tidak valid.')
@@ -206,6 +217,7 @@ export const bookingSchema = z
 
 export type BookingInput = z.output<typeof bookingSchema>;
 export type SessionInput = z.output<typeof sessionInputSchema>;
+export type PackageLineInput = z.output<typeof packageLineSchema>;
 
 export const bookingMoveSchema = z.object({
 	id: z.uuid(),

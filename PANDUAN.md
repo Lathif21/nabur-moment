@@ -85,7 +85,7 @@ Formulir di halaman **Booking** situs membuat **klien** (atau memakai klien yang
 
 - **Inquiry dari website** masuk otomatis ke kolom **Inquiry** di menu **Booking**. Pesan dari klien tampil di halaman booking, bagian _Catatan_.
 - **Booking baru manual:** Booking → **Booking baru**. Pilih klien (atau ketik klien baru), isi judul, jenis acara, lalu **sesi** (lamaran, akad, resepsi…, masing-masing dengan tanggal, jam, venue). Tanggal sesi pertama = **Hari H**.
-- **Paket & harga:** pilih paket, tambahkan add-on bila ada. _Harga disepakati_ terisi otomatis (paket + add-on) dan boleh diubah. Tidak ada diskon.
+- **Paket & harga:** pilih satu paket atau lebih lewat **+ Tambah paket…** (misalnya Lamaran + Wedding), tambahkan add-on bila ada. _Harga disepakati_ terisi otomatis (semua paket + add-on) dan boleh diubah. Tidak ada diskon. Klien juga bisa mencentang lebih dari satu paket di formulir booking situs.
 - **Pindah tahap:** seret kartu di papan, atau tombol **⋯ → Pindah ke…** (juga **Pindah tahap** di halaman booking).
   - Ke **Booked** dan seterusnya hanya bisa setelah **DP lunas**.
   - Ke **Batal** wajib menulis alasan. DP yang sudah dibayar tetap dihitung pemasukan; pelunasan dibatalkan dan invoice yang belum dibayar otomatis dibatalkan.

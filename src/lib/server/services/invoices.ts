@@ -9,6 +9,7 @@ import {
 	booking,
 	bookingAddon,
 	bookingInstallment,
+	bookingPackage,
 	client,
 	counter,
 	invoice,
@@ -54,8 +55,7 @@ async function bookingForInvoice(tx: DbOrTx, bookingId: string) {
 			clientId: booking.clientId,
 			title: booking.title,
 			stage: booking.stage,
-			agreedPrice: booking.agreedPrice,
-			packageSnapshot: booking.packageSnapshot
+			agreedPrice: booking.agreedPrice
 		})
 		.from(booking)
 		.where(eq(booking.id, bookingId))
@@ -66,16 +66,23 @@ async function bookingForInvoice(tx: DbOrTx, bookingId: string) {
 }
 
 /**
- * Contract lines for an installment invoice: the package and the add-ons (no discounts). When the
+ * Contract lines for an installment invoice: each package and each add-on (no discounts). When the
  * agreed price was edited by hand they no longer add up, so one line carries the agreed price.
  */
 async function contractItems(
 	tx: DbOrTx,
-	b: Pick<
-		Awaited<ReturnType<typeof bookingForInvoice>>,
-		'id' | 'title' | 'agreedPrice' | 'packageSnapshot'
-	>
+	b: Pick<Awaited<ReturnType<typeof bookingForInvoice>>, 'id' | 'title' | 'agreedPrice'>
 ): Promise<InvoiceItem[]> {
+	// Name, price and what each package includes, as stored on the booking when it was picked
+	const packages = await tx
+		.select({
+			name: bookingPackage.name,
+			price: bookingPackage.price,
+			inclusions: bookingPackage.inclusions
+		})
+		.from(bookingPackage)
+		.where(eq(bookingPackage.bookingId, b.id))
+		.orderBy(asc(bookingPackage.sort));
 	const addons = await tx
 		.select({
 			name: bookingAddon.name,
@@ -88,20 +95,15 @@ async function contractItems(
 		.leftJoin(addon, eq(addon.id, bookingAddon.addonId))
 		.where(eq(bookingAddon.bookingId, b.id))
 		.orderBy(asc(bookingAddon.createdAt));
-	// What the package includes, as stored on the booking when it was picked
-	const inclusions = (b.packageSnapshot?.inclusions ?? []).map((s) => s.trim()).filter(Boolean);
+	const clean = (items: string[]) => items.map((s) => s.trim()).filter(Boolean);
 	const withDetails = (details: string[]) => (details.length ? { details } : {});
 	const lines: InvoiceItem[] = [
-		...(b.packageSnapshot
-			? [
-					{
-						description: `Paket ${b.packageSnapshot.name}`,
-						qty: 1,
-						unitPrice: b.packageSnapshot.price,
-						...withDetails(inclusions)
-					}
-				]
-			: []),
+		...packages.map((p) => ({
+			description: `Paket ${p.name}`,
+			qty: 1,
+			unitPrice: p.price,
+			...withDetails(clean(p.inclusions))
+		})),
 		...addons.map((a) => ({
 			description: `Add-on: ${a.name}`,
 			qty: a.qty,
@@ -110,14 +112,22 @@ async function contractItems(
 		}))
 	];
 	if (lines.length && itemsTotal(lines) === b.agreedPrice) return lines;
-	const label = b.packageSnapshot ? `Paket ${b.packageSnapshot.name}` : 'Jasa dokumentasi';
+	const label = packages.length
+		? `Paket ${packages.map((p) => p.name).join(' + ')}`
+		: 'Jasa dokumentasi';
+	// With several packages, each one's inclusions sit under its name
+	const included = packages.flatMap((p) =>
+		packages.length > 1
+			? [`Paket ${p.name}`, ...clean(p.inclusions).map((i) => `– ${i}`)]
+			: clean(p.inclusions)
+	);
 	return [
 		{
 			description: `${label}${addons.length ? ' + add-on' : ''} (${b.title}), harga disepakati`,
 			qty: 1,
 			unitPrice: b.agreedPrice,
 			// Prices no longer add up, but the client still sees what the deal covers
-			...withDetails([...inclusions, ...addons.map((a) => `Add-on: ${a.name}`)])
+			...withDetails([...included, ...addons.map((a) => `Add-on: ${a.name}`)])
 		}
 	];
 }
@@ -128,8 +138,7 @@ export async function bookingContractLines(db: DbOrTx, bookingId: string) {
 		.select({
 			id: booking.id,
 			title: booking.title,
-			agreedPrice: booking.agreedPrice,
-			packageSnapshot: booking.packageSnapshot
+			agreedPrice: booking.agreedPrice
 		})
 		.from(booking)
 		.where(eq(booking.id, bookingId));
@@ -176,8 +185,7 @@ export async function insertInstallmentInvoice(
 			id: booking.id,
 			clientId: booking.clientId,
 			title: booking.title,
-			agreedPrice: booking.agreedPrice,
-			packageSnapshot: booking.packageSnapshot
+			agreedPrice: booking.agreedPrice
 		})
 		.from(booking)
 		.where(eq(booking.id, args.bookingId));

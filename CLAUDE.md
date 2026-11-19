@@ -49,7 +49,7 @@ Patterns are borrowed from the Befisien CRM (`D:\Lathif Personal\Befisien\intern
 - A booking has one or more `booking_session`s (lamaran, akad, resepsi…). First session date = Hari H.
 - Schedule: DP fixed 50% (`DP_PERCENT`, not editable) + Pelunasan due on Hari H; installments sum to `agreed_price`.
 - Numbers: invoices `INV/NM/{YYYY}/{MM}/{NNN}`, kwitansi `KW/NM/{YYYY}/{MM}/{NNN}`. Invoices show the BCA account; payments may use any method.
-- Add-ons only, no discounts: `agreed_price` = package + add-ons.
+- A booking may have several packages (`booking_package` snapshots). Add-ons only, no discounts: `agreed_price` = packages + add-ons.
 - Cancelled (`lost`) booking: a paid DP is kept as income; pelunasan cancelled; unpaid invoices voided.
 - Invoices are voided, never deleted. `partial` / `paid` come only from payments.
 - Expense with `booking_id` = direct cost; without = overhead. Profit = payments − expenses.
