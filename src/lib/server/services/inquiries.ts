@@ -47,6 +47,11 @@ export async function submitInquiry(db: DbOrTx, input: Omit<InquiryInput, 'websi
 			venue: input.venue,
 			city: input.city
 		});
-		return { bookingId: booking.id, clientId, newClient: !existing };
+		return {
+			bookingId: booking.id,
+			clientId,
+			newClient: !existing,
+			packageNames: booking.packageNames
+		};
 	});
 }

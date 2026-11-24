@@ -542,7 +542,7 @@ export async function createInquiryBooking(db: DbOrTx, input: InquiryBookingInpu
 		userId: null,
 		occurredAt: now
 	});
-	return { id: row.id };
+	return { id: row.id, packageNames: packages.map((p) => p.name) };
 }
 
 /** New booking at the top of its column, with sessions, package snapshots and add-ons */

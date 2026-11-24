@@ -1,8 +1,11 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { waitUntil } from '@vercel/functions';
 import { resolve } from '$app/paths';
 import { fieldErrors, formObject } from '#lib/schemas/access.ts';
 import { inquirySchema } from '#lib/schemas/inquiry.ts';
 import { db } from '#lib/server/db/index.ts';
+import { inquiryAlertText } from '#lib/server/notify/inquiry-message.ts';
+import { notifyOwner } from '#lib/server/notify/openwa.ts';
 import { listLeadSources } from '#lib/server/services/clients.ts';
 import { submitInquiry } from '#lib/server/services/inquiries.ts';
 import { loadPublicList, loadPublicPage } from '#lib/server/site.ts';
@@ -32,7 +35,7 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request }) => {
+	default: async ({ request, url }) => {
 		const raw = formObject(await request.formData(), ['packageIds']);
 		// Honeypot filled: act as if it worked, save nothing
 		if (typeof raw.website === 'string' && raw.website.trim()) {
@@ -44,7 +47,26 @@ export const actions: Actions = {
 			const values = Object.fromEntries(Object.entries(raw).filter(([k]) => k !== 'website'));
 			return fail(400, { fields: fieldErrors(parsed.error.issues), values });
 		}
-		await submitInquiry(db, parsed.data);
+		const saved = await submitInquiry(db, parsed.data);
+		// WhatsApp alert to the owner after the response; a gateway failure never fails the form
+		const d = parsed.data;
+		const text = inquiryAlertText({
+			name: d.name,
+			phone: d.phone,
+			email: d.email,
+			instagram: d.instagram,
+			eventType: d.eventType,
+			eventDate: d.eventDate,
+			venue: d.venue,
+			city: d.city,
+			packageNames: saved.packageNames,
+			message: d.message,
+			newClient: saved.newClient,
+			bookingUrl: new URL(resolve(`admin/booking/${saved.bookingId}`), url.origin).href
+		});
+		waitUntil(
+			notifyOwner(text).catch((err) => console.error('[openwa] inquiry alert failed', err))
+		);
 		redirect(303, resolve('booking/terima-kasih'));
 	}
 };

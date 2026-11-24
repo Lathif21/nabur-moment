@@ -68,6 +68,25 @@ export const variables = defineEnvVars({
 			'Sender of password reset emails, on a domain verified in Resend, e.g. `Nabur Moment <noreply@naburmoment.com>`',
 		schema: optional
 	},
+	// WhatsApp alert to the owner on each /booking inquiry, through a self-hosted OpenWA gateway
+	// (github.com/rmyndharis/OpenWA). All four set = on; any missing = off (local dev logs it).
+	OPENWA_URL: {
+		description:
+			'OpenWA base URL without `/api`, e.g. `https://wa.example.com` (default port 2785)',
+		schema: optional
+	},
+	OPENWA_API_KEY: {
+		description: 'OpenWA API key (OPERATOR or higher), sent as `X-API-Key`',
+		schema: optional
+	},
+	OPENWA_SESSION_ID: {
+		description: 'OpenWA session id whose WhatsApp number sends the alert (QR already scanned)',
+		schema: optional
+	},
+	OPENWA_NOTIFY_TO: {
+		description: 'WhatsApp number that receives inquiry alerts, e.g. `0812…` or `628…`',
+		schema: optional
+	},
 	CRON_SECRET: {
 		description: 'Vercel Cron sends it as `Authorization: Bearer …`; cron routes check it',
 		schema: optional
