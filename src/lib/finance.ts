@@ -9,11 +9,22 @@ export function splitPrice(agreedPrice: number): { dp: number; pelunasan: number
 	return { dp, pelunasan: agreedPrice - dp };
 }
 
-export const INSTALLMENT_LABEL: Record<'dp' | 'pelunasan' | 'other', string> = {
+/**
+ * `full` replaces the DP when the client pays everything at once ("Lunas sekaligus"): one invoice
+ * for the whole price, the pelunasan drops to 0 (and picks up add-ons added after the payment).
+ */
+export type InstallmentKind = 'dp' | 'full' | 'pelunasan' | 'other';
+
+export const INSTALLMENT_LABEL: Record<InstallmentKind, string> = {
 	dp: `DP ${DP_PERCENT}%`,
+	full: 'Lunas sekaligus',
 	pelunasan: 'Pelunasan',
 	other: 'Lainnya'
 };
+
+/** The first installment of the schedule: the DP, or the whole price when paid at once */
+export const isFirstInstallment = (kind: InstallmentKind): kind is 'dp' | 'full' =>
+	kind === 'dp' || kind === 'full';
 
 export const INVOICE_STATUSES = ['draft', 'sent', 'partial', 'paid', 'overdue', 'void'] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
@@ -69,7 +80,7 @@ export const DP_INVOICE_DAYS = 7;
  * (never before the invoice date; DP_INVOICE_DAYS when Hari H is not set yet).
  */
 export function suggestedDueDate(
-	kind: 'dp' | 'pelunasan' | 'other',
+	kind: InstallmentKind,
 	installmentDue: string | null,
 	issueDate: string
 ): string {

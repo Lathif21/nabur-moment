@@ -134,6 +134,13 @@
       "when": 1795092093526,
       "tag": "0018_booking_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795502553015,
+      "tag": "0019_installment_full",
+      "breakpoints": true
     }
   ]
 }

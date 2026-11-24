@@ -27,6 +27,8 @@ const datesMessage = {
 export const installmentInvoiceSchema = z
 	.object({
 		installmentId: z.uuid('Pilih termin.'),
+		/** DP row only: bill the DP or the whole price at once (switches the schedule) */
+		billAs: z.enum(['dp', 'full']).optional().catch(undefined),
 		issueDate: day('tanggal invoice'),
 		dueDate: day('jatuh tempo'),
 		notes
@@ -91,17 +93,18 @@ export type InvoiceFilter = z.output<typeof invoiceFilterSchema>;
 export const PAYMENT_METHODS = ['transfer', 'cash', 'ewallet', 'other'] as const;
 
 /**
- * "Catat pembayaran": what it pays is an open invoice (`inv:<id>`) or an installment without one
- * (`inst:<id>`); the amount is capped at what is still open there.
+ * "Catat pembayaran": what it pays is an open invoice (`inv:<id>`), the unbilled part of an
+ * installment (`inst:<id>`), or the whole price at once (`full:<DP installment id>`, which switches
+ * the DP to "Lunas sekaligus"); the amount is capped at what is still open there.
  */
 export const paymentSchema = z.object({
 	bookingId: z.uuid('Pilih booking.'),
 	target: z
 		.string()
-		.regex(/^(inv|inst):[0-9a-f-]{36}$/i, 'Pilih invoice atau termin yang dibayar.')
+		.regex(/^(inv|inst|full):[0-9a-f-]{36}$/i, 'Pilih invoice atau termin yang dibayar.')
 		.transform((v) => {
 			const [kind, id] = v.split(':');
-			return { kind: kind as 'inv' | 'inst', id };
+			return { kind: kind as 'inv' | 'inst' | 'full', id };
 		}),
 	paidOn: day('tanggal bayar'),
 	amount: z.coerce

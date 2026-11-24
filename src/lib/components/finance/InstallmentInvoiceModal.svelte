@@ -1,17 +1,19 @@
 <script lang="ts">
-	// "Buat invoice" for a DP / Pelunasan installment (P3-02). Posts to the hosting page's
-	// `?/invoice` action; the amount is the installment's, so only dates and notes are asked.
+	// "Buat invoice" for an installment (P3-02). Posts to the hosting page's `?/invoice` action; the
+	// amount is what is not billed yet, so only dates and notes are asked. For the DP, while nothing
+	// is paid or billed, `choice` offers the whole price at once ("Lunas sekaligus").
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import Modal from '#lib/components/admin/Modal.svelte';
-	import { INSTALLMENT_LABEL, suggestedDueDate } from '#lib/finance.ts';
+	import { INSTALLMENT_LABEL, suggestedDueDate, type InstallmentKind } from '#lib/finance.ts';
 	import { dayKeyWib, rupiah } from '#lib/format.ts';
 	import { toast } from '#lib/toast.ts';
 
 	type Installment = {
 		id: string;
-		kind: 'dp' | 'pelunasan' | 'other';
-		amount: number;
+		kind: InstallmentKind;
+		/** not on an active invoice yet: what this invoice bills */
+		unbilled: number;
 		dueDate: string | null;
 	};
 
@@ -20,9 +22,18 @@
 		installment: Installment | null;
 		/** Booking title, shown under the heading */
 		bookingTitle: string;
+		/** DP row that can still switch: the DP and the whole-price amounts */
+		choice?: { dp: number; full: number } | null;
 	};
 
-	let { open = $bindable(), installment, bookingTitle }: Props = $props();
+	let { open = $bindable(), installment, bookingTitle, choice = null }: Props = $props();
+
+	let billAs = $state<'dp' | 'full'>('dp');
+	const amount = $derived(
+		choice ? (billAs === 'full' ? choice.full : choice.dp) : (installment?.unbilled ?? 0)
+	);
+	/** The kind the invoice is for, after the choice */
+	const kind = $derived<InstallmentKind>(choice ? billAs : (installment?.kind ?? 'dp'));
 
 	let issueDate = $state(dayKeyWib());
 	let dueDate = $state('');
@@ -35,6 +46,7 @@
 		if (!open || !installment) return;
 		const inst = installment;
 		untrack(() => {
+			billAs = inst.kind === 'full' ? 'full' : 'dp';
 			issueDate = dayKeyWib();
 			dueDate = suggestedDueDate(inst.kind, inst.dueDate, issueDate);
 			dueTouched = false;
@@ -50,7 +62,7 @@
 
 <Modal
 	bind:open
-	title="Buat invoice {installment ? INSTALLMENT_LABEL[installment.kind] : ''}"
+	title="Buat invoice {installment ? INSTALLMENT_LABEL[kind] : ''}"
 	description={bookingTitle}
 >
 	{#if installment}
@@ -77,9 +89,24 @@
 			}}
 		>
 			<input type="hidden" name="installmentId" value={installment.id} />
+			{#if choice}
+				<fieldset class="field">
+					<legend>Yang ditagih</legend>
+					<div class="flex flex-col gap-2">
+						<label class="flex items-center gap-2 text-body">
+							<input type="radio" name="billAs" value="dp" bind:group={billAs} />
+							{INSTALLMENT_LABEL.dp} ({rupiah(choice.dp)}), pelunasan di Hari H
+						</label>
+						<label class="flex items-center gap-2 text-body">
+							<input type="radio" name="billAs" value="full" bind:group={billAs} />
+							{INSTALLMENT_LABEL.full} ({rupiah(choice.full)}), tanpa pelunasan
+						</label>
+					</div>
+				</fieldset>
+			{/if}
 			<p class="flex justify-between gap-3 rounded-card bg-sage-20 px-3 py-2 text-body">
 				<span>Jumlah ditagih</span>
-				<strong class="tabular-nums">{rupiah(installment.amount)}</strong>
+				<strong class="tabular-nums">{rupiah(amount)}</strong>
 			</p>
 			<div class="grid gap-3 sm:grid-cols-2">
 				<div class="field">
@@ -108,7 +135,7 @@
 						aria-describedby="inv-due-hint"
 					/>
 					<p id="inv-due-hint" class="field__hint">
-						{installment.kind === 'pelunasan' ? 'Default: Hari H.' : 'Default: 7 hari.'}
+						{kind === 'pelunasan' ? 'Default: Hari H.' : 'Default: 7 hari.'}
 					</p>
 					{#if errors.dueDate}<p class="field__error">{errors.dueDate}</p>{/if}
 				</div>

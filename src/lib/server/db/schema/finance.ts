@@ -23,7 +23,8 @@ import { user } from './auth.ts';
 import { booking } from './crm.ts';
 import { media } from './media.ts';
 
-export const installmentKind = pgEnum('installment_kind', ['dp', 'pelunasan', 'other']);
+/** `full` = the DP row switched to the whole price ("Lunas sekaligus", 0019); never both on a booking */
+export const installmentKind = pgEnum('installment_kind', ['dp', 'pelunasan', 'other', 'full']);
 /** `partial` / `paid` come only from payments; `overdue` from the daily check (on read) */
 export const invoiceStatus = pgEnum('invoice_status', [
 	'draft',
@@ -43,8 +44,8 @@ const updatedAt = () =>
 		.$onUpdate(() => new Date());
 
 /**
- * Payment schedule: DP (fixed 50% of the agreed price, no due date) + Pelunasan (the rest, due on
- * Hari H). Installments sum to `agreed_price`. Kept by `ensureSchedule` (services/installments.ts).
+ * Payment schedule: DP (fixed 50% of the agreed price, no due date) or `full` (the whole price at
+ * once) + Pelunasan (the rest, due on Hari H). Installments sum to `agreed_price`. Kept by `ensureSchedule` (services/installments.ts).
  */
 export const bookingInstallment = pgTable(
 	'booking_installment',

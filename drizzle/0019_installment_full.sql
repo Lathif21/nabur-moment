@@ -1,0 +1,1 @@
+ALTER TYPE "public"."installment_kind" ADD VALUE 'full';

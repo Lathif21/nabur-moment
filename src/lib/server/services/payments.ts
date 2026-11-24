@@ -18,12 +18,16 @@ import { BOOKED_STAGES, STAGE_LABEL } from '../../crm.ts';
 import {
 	INSTALLMENT_LABEL,
 	PAYMENT_METHOD_LABEL,
+	isFirstInstallment,
+	splitPrice,
 	suggestedDueDate,
+	type InstallmentKind,
 	type InvoiceStatus
 } from '../../finance.ts';
 import { dayKeyWib, rupiah } from '../../format.ts';
 import type { PaymentFilter, PaymentInput } from '../../schemas/finance.ts';
 import { ServiceError } from './errors.ts';
+import { setFirstInstallmentKind, unbilledSql } from './installments.ts';
 import { bookingContractLines, insertInstallmentInvoice, nextNumber } from './invoices.ts';
 import { PRIVATE_BUCKET } from '../storage/files.ts';
 
@@ -80,18 +84,31 @@ export async function syncInvoiceStatus(db: DbOrTx, invoiceId: string, today = d
 	return status;
 }
 
-/** DP fully paid ⇔ `booked_at` set (keeps the calendar and the Booked rule in step) */
+/**
+ * DP fully paid ⇔ `booked_at` set (keeps the calendar and the Booked rule in step). "Lunas
+ * sekaligus" counts as booked once DP_PERCENT of it is in.
+ */
 async function syncBookedAt(db: DbOrTx, bookingId: string, when: Date) {
-	const [dp] = await db
-		.select({ id: bookingInstallment.id, amount: bookingInstallment.amount })
+	const [first] = await db
+		.select({
+			id: bookingInstallment.id,
+			kind: bookingInstallment.kind,
+			amount: bookingInstallment.amount
+		})
 		.from(bookingInstallment)
-		.where(and(eq(bookingInstallment.bookingId, bookingId), eq(bookingInstallment.kind, 'dp')));
+		.where(
+			and(
+				eq(bookingInstallment.bookingId, bookingId),
+				inArray(bookingInstallment.kind, ['dp', 'full'])
+			)
+		);
 	const [b] = await db
 		.select({ bookedAt: booking.bookedAt, stage: booking.stage })
 		.from(booking)
 		.where(eq(booking.id, bookingId));
-	if (!dp || !b) return { dpPaidNow: false };
-	const full = dp.amount > 0 && (await installmentPaid(db, dp.id)) >= dp.amount;
+	if (!first || !b) return { dpPaidNow: false };
+	const needed = first.kind === 'full' ? splitPrice(first.amount).dp : first.amount;
+	const full = needed > 0 && (await installmentPaid(db, first.id)) >= needed;
 	if (full && !b.bookedAt) {
 		await db.update(booking).set({ bookedAt: when }).where(eq(booking.id, bookingId));
 		return { dpPaidNow: true };
@@ -135,12 +152,8 @@ export async function recordPayment(db: DbOrTx, input: PaymentInput, userId: str
 		let installmentId: string | null;
 		let open: number;
 		let label: string;
-		/** Installment paid without an invoice yet: its invoice is created below (every payment has one) */
-		let toInvoice: {
-			id: string;
-			kind: 'dp' | 'pelunasan' | 'other';
-			dueDate: string | null;
-		} | null = null;
+		/** Unbilled part of an installment: its invoice is created below (every payment has one) */
+		let toInvoice: { id: string; kind: InstallmentKind; dueDate: string | null } | null = null;
 		if (input.target.kind === 'inv') {
 			const [inv] = await tx
 				.select()
@@ -155,25 +168,56 @@ export async function recordPayment(db: DbOrTx, input: PaymentInput, userId: str
 			open = inv.total - (await invoicePaid(tx, inv.id));
 			label = inv.number;
 		} else {
+			// "Lunas sekaligus": the DP row becomes the whole price first
+			if (input.target.kind === 'full') {
+				const [first] = await tx
+					.select({ bookingId: bookingInstallment.bookingId, kind: bookingInstallment.kind })
+					.from(bookingInstallment)
+					.where(eq(bookingInstallment.id, input.target.id));
+				if (!first || first.bookingId !== b.id || !isFirstInstallment(first.kind))
+					throw new ServiceError('Termin ini bukan milik booking tersebut.', 'target');
+				await setFirstInstallmentKind(tx, b.id, 'full');
+			}
 			const [inst] = await tx
-				.select()
+				.select({
+					id: bookingInstallment.id,
+					bookingId: bookingInstallment.bookingId,
+					kind: bookingInstallment.kind,
+					dueDate: bookingInstallment.dueDate,
+					cancelledAt: bookingInstallment.cancelledAt,
+					unbilled: unbilledSql.mapWith(Number)
+				})
 				.from(bookingInstallment)
 				.where(eq(bookingInstallment.id, input.target.id))
-				.for('update');
+				.for('update', { of: bookingInstallment });
 			if (!inst || inst.bookingId !== b.id)
 				throw new ServiceError('Termin ini bukan milik booking tersebut.', 'target');
 			if (inst.cancelledAt) throw new ServiceError('Termin ini sudah dibatalkan.', 'target');
-			// Pay through the installment's invoice when it has one, so its status follows
-			const [inv] = await tx
-				.select({ id: invoice.id, number: invoice.number })
+			installmentId = inst.id;
+			label = INSTALLMENT_LABEL[inst.kind];
+			// Pay through the installment's open invoice when it has one, so its status follows;
+			// otherwise bill the part not invoiced yet (e.g. an add-on after the pelunasan was paid)
+			const invs = await tx
+				.select({ id: invoice.id, total: invoice.total })
 				.from(invoice)
 				.where(and(eq(invoice.installmentId, inst.id), ne(invoice.status, 'void')))
-				.limit(1);
-			invoiceId = inv?.id ?? null;
-			installmentId = inst.id;
-			open = inst.amount - (await installmentPaid(tx, inst.id));
-			label = INSTALLMENT_LABEL[inst.kind];
-			if (!inv) toInvoice = inst;
+				.orderBy(asc(invoice.issueDate), asc(invoice.number));
+			let openInv: { id: string; open: number } | null = null;
+			for (const i of invs) {
+				const left = i.total - (await invoicePaid(tx, i.id));
+				if (left > 0) {
+					openInv = { id: i.id, open: left };
+					break;
+				}
+			}
+			if (openInv) {
+				invoiceId = openInv.id;
+				open = openInv.open;
+			} else {
+				invoiceId = null;
+				open = inst.unbilled;
+				toInvoice = inst;
+			}
 		}
 		if (open <= 0) throw new ServiceError('Tagihan ini sudah lunas.', 'target');
 		if (input.amount > open)
@@ -325,8 +369,9 @@ export async function listPayments(db: DbOrTx, f: Partial<PaymentFilter> = {}) {
 }
 
 /**
- * What a booking can still be paid for, for the payment form: open invoices, and installments
- * that have no active invoice (paying one creates its invoice), each with the amount still open.
+ * What a booking can still be paid for, for the payment form: open invoices, the part of each
+ * installment not on an invoice yet (paying it creates that invoice), and, while nothing is paid or
+ * billed, "Lunas sekaligus" (the whole price at once), each with the amount still open.
  */
 export async function paymentTargets(db: DbOrTx, bookingId: string) {
 	const [installments, invoices] = await Promise.all([
@@ -338,7 +383,8 @@ export async function paymentTargets(db: DbOrTx, bookingId: string) {
 				cancelledAt: bookingInstallment.cancelledAt,
 				paid: sql<number>`(select coalesce(sum(p.amount), 0) from "payment" p where p.installment_id = "booking_installment"."id")::bigint`.mapWith(
 					Number
-				)
+				),
+				unbilled: unbilledSql.mapWith(Number)
 			})
 			.from(bookingInstallment)
 			.where(eq(bookingInstallment.bookingId, bookingId))
@@ -358,27 +404,45 @@ export async function paymentTargets(db: DbOrTx, bookingId: string) {
 			.where(and(eq(invoice.bookingId, bookingId), ne(invoice.status, 'void')))
 			.orderBy(asc(invoice.issueDate), asc(invoice.number))
 	]);
-	const invoiced = new Set(invoices.map((i) => i.installmentId).filter(Boolean));
+	const openInvoices = invoices.filter((i) => i.total - i.paid > 0);
+	const withOpenInvoice = new Set(openInvoices.map((i) => i.installmentId).filter(Boolean));
 	const kindOf = new Map(installments.map((i) => [i.id, i.kind]));
+
+	// "Lunas sekaligus" while the DP can still be switched: no payment, no invoice on the schedule
+	const dp = installments.find((i) => i.kind === 'dp' && !i.cancelledAt);
+	const untouched =
+		!installments.some((i) => i.paid > 0) &&
+		!invoices.some((i) => i.installmentId && kindOf.has(i.installmentId));
+	const scheduled = installments
+		.filter((i) => i.kind !== 'other' && !i.cancelledAt)
+		.reduce((s, i) => s + i.amount, 0);
+
 	return [
-		...invoices
-			.filter((i) => i.total - i.paid > 0)
-			.map((i) => {
-				const kind = i.installmentId ? kindOf.get(i.installmentId) : undefined;
-				return {
-					value: `inv:${i.id}`,
-					// "DP 50% · INV/NM/…" so the termin stays recognisable once it has its invoice
-					label: kind ? `${INSTALLMENT_LABEL[kind]} · ${i.number}` : i.number,
-					open: i.total - i.paid
-				};
-			}),
+		...openInvoices.map((i) => {
+			const kind = i.installmentId ? kindOf.get(i.installmentId) : undefined;
+			return {
+				value: `inv:${i.id}`,
+				// "DP 50% · INV/NM/…" so the termin stays recognisable once it has its invoice
+				label: kind ? `${INSTALLMENT_LABEL[kind]} · ${i.number}` : i.number,
+				open: i.total - i.paid
+			};
+		}),
 		...installments
-			.filter((i) => !i.cancelledAt && !invoiced.has(i.id) && i.amount - i.paid > 0)
+			.filter((i) => !i.cancelledAt && !withOpenInvoice.has(i.id) && i.unbilled > 0)
 			.map((i) => ({
 				value: `inst:${i.id}`,
 				label: INSTALLMENT_LABEL[i.kind],
-				open: i.amount - i.paid
-			}))
+				open: i.unbilled
+			})),
+		...(dp && untouched && scheduled > dp.amount
+			? [
+					{
+						value: `full:${dp.id}`,
+						label: `${INSTALLMENT_LABEL.full} (DP + pelunasan)`,
+						open: scheduled
+					}
+				]
+			: [])
 	];
 }
 

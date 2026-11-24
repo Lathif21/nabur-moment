@@ -20,7 +20,9 @@ import {
 	INSTALLMENT_LABEL,
 	counterKey,
 	docNumber,
+	isFirstInstallment,
 	itemsTotal,
+	type InstallmentKind,
 	type InvoiceStatus
 } from '../../finance.ts';
 import { dayKeyWib, rupiah } from '../../format.ts';
@@ -30,6 +32,7 @@ import type {
 	InvoiceFilter
 } from '../../schemas/finance.ts';
 import { ServiceError } from './errors.ts';
+import { setFirstInstallmentKind, unbilledSql } from './installments.ts';
 
 /**
  * Next number of the document's month, e.g. INV/NM/2026/11/007. One atomic upsert on the month's
@@ -172,7 +175,7 @@ export async function insertInstallmentInvoice(
 	tx: DbOrTx,
 	args: {
 		bookingId: string;
-		installment: { id: string; kind: 'dp' | 'pelunasan' | 'other' };
+		installment: { id: string; kind: InstallmentKind };
 		total: number;
 		issueDate: string;
 		dueDate: string;
@@ -215,44 +218,62 @@ export async function insertInstallmentInvoice(
 	return row;
 }
 
-/** "Buat invoice" for the DP or the pelunasan: bills what is still unpaid on that installment */
+/**
+ * "Buat invoice" for an installment: bills what is not on an active invoice yet. Usually the whole
+ * installment; after an add-on on an already paid installment, only the difference (a follow-up
+ * invoice). `billAs` switches the first installment between DP and "Lunas sekaligus" first.
+ */
 export async function createInstallmentInvoice(
 	db: DbOrTx,
 	input: InstallmentInvoiceInput,
 	userId: string | null
 ) {
 	return db.transaction(async (tx) => {
-		const [inst] = await tx
-			.select()
-			.from(bookingInstallment)
-			.where(eq(bookingInstallment.id, input.installmentId))
-			.for('update');
+		const lock = () =>
+			tx
+				.select({
+					id: bookingInstallment.id,
+					bookingId: bookingInstallment.bookingId,
+					kind: bookingInstallment.kind,
+					cancelledAt: bookingInstallment.cancelledAt,
+					unbilled: unbilledSql.mapWith(Number)
+				})
+				.from(bookingInstallment)
+				.where(eq(bookingInstallment.id, input.installmentId))
+				.for('update', { of: bookingInstallment });
+		let [inst] = await lock();
 		if (!inst) throw new ServiceError('Termin tidak ditemukan.', 'installmentId');
 		const b = await bookingForInvoice(tx, inst.bookingId);
 		if (inst.cancelledAt) throw new ServiceError('Termin ini sudah dibatalkan.', 'installmentId');
+		if (input.billAs && isFirstInstallment(inst.kind) && input.billAs !== inst.kind) {
+			await setFirstInstallmentKind(tx, b.id, input.billAs);
+			[inst] = await lock();
+		}
 
-		const [open] = await tx
-			.select({ number: invoice.number })
+		const active = await tx
+			.select({ number: invoice.number, paid: paidSql.mapWith(Number) })
 			.from(invoice)
 			.where(and(eq(invoice.installmentId, inst.id), ne(invoice.status, 'void')))
-			.limit(1);
-		if (open)
+			.orderBy(asc(invoice.issueDate), asc(invoice.number));
+		// One unpaid invoice per installment: a new amount replaces it (void, then bill again)
+		const unpaid = active.find((i) => i.paid === 0);
+		if (unpaid)
 			throw new ServiceError(
-				`Termin ini sudah punya invoice ${open.number}. Batalkan dulu bila ingin membuat ulang.`,
+				`Termin ini sudah punya invoice ${unpaid.number}. Batalkan dulu bila ingin membuat ulang.`,
 				'installmentId'
 			);
-
-		const [{ paid }] = await tx
-			.select({ paid: sql<number>`coalesce(sum(${payment.amount}), 0)::bigint`.mapWith(Number) })
-			.from(payment)
-			.where(eq(payment.installmentId, inst.id));
-		const total = inst.amount - paid;
-		if (total <= 0) throw new ServiceError('Termin ini sudah lunas.', 'installmentId');
+		if (inst.unbilled <= 0)
+			throw new ServiceError(
+				active.length
+					? `Termin ini sudah ditagih penuh (${active.map((i) => i.number).join(', ')}).`
+					: 'Termin ini sudah lunas.',
+				'installmentId'
+			);
 
 		return insertInstallmentInvoice(tx, {
 			bookingId: b.id,
 			installment: inst,
-			total,
+			total: inst.unbilled,
 			issueDate: input.issueDate,
 			dueDate: input.dueDate,
 			notes: input.notes,

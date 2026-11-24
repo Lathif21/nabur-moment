@@ -37,7 +37,9 @@
 		INSTALLMENT_LABEL,
 		INVOICE_STATUS_LABEL,
 		PAYMENT_METHOD_LABEL,
-		invoiceTone
+		invoiceTone,
+		isFirstInstallment,
+		splitPrice
 	} from '#lib/finance.ts';
 	import { countdown, dateID, phoneDisplay, rupiah } from '#lib/format.ts';
 	import { MANUAL_ACTIVITY_TYPES } from '#lib/schemas/crm.ts';
@@ -89,23 +91,40 @@
 	let editOpen = $state(false);
 
 	// ---------- invoices (P3-02) ----------
-	const activeInvoice = (installmentId: string) =>
-		data.invoices.find((i) => i.installmentId === installmentId && i.status !== 'void');
-	const canBill = (row: (typeof data.schedule)[number]) =>
+	type ScheduleRow = (typeof data.schedule)[number];
+	const activeInvoices = (installmentId: string) =>
+		data.invoices.filter((i) => i.installmentId === installmentId && i.status !== 'void');
+	// A follow-up invoice bills what the installment grew by (an add-on after its invoice was
+	// paid); while an invoice of it is still unpaid, that one is voided and made again instead
+	const canBill = (row: ScheduleRow) =>
 		data.allow.invoices.create &&
 		b.stage !== 'lost' &&
 		!row.cancelledAt &&
-		row.amount - row.paid > 0;
-	let billing = $state<(typeof data.schedule)[number] | null>(null);
+		row.unbilled > 0 &&
+		!activeInvoices(row.id).some((i) => i.paid === 0);
+	// A pelunasan of Rp 0 ("Lunas sekaligus" covers everything) is left out of the table
+	const scheduleRows = $derived(
+		data.schedule.filter((r) => r.amount > 0 || r.paid > 0 || activeInvoices(r.id).length)
+	);
+	// DP ⇄ "Lunas sekaligus" while nothing on the schedule is paid or billed yet
+	const firstSwitchable = $derived(
+		!b.bookedAt && data.schedule.every((r) => r.paid === 0 && activeInvoices(r.id).length === 0)
+	);
+	const scheduledTotal = $derived(
+		data.schedule
+			.filter((r) => r.kind !== 'other' && !r.cancelledAt)
+			.reduce((s, r) => s + r.amount, 0)
+	);
+	let billing = $state<ScheduleRow | null>(null);
 	let installmentOpen = $state(false);
 	let customOpen = $state(false);
-	function openInstallmentInvoice(row: (typeof data.schedule)[number]) {
+	function openInstallmentInvoice(row: ScheduleRow) {
 		billing = row;
 		installmentOpen = true;
 	}
 
 	/** Until payments exist (P3-04) the DP counts as paid once the booking has `booked_at` */
-	function installmentStatus(row: (typeof data.schedule)[number]) {
+	function installmentStatus(row: ScheduleRow) {
 		if (row.cancelledAt) return { label: 'Dibatalkan', tone: '' };
 		if (row.amount > 0 && row.paid >= row.amount) return { label: 'Lunas', tone: 'chip--success' };
 		if (row.paid > 0) return { label: `Dibayar ${rupiah(row.paid)}`, tone: 'chip--warning' };
@@ -324,13 +343,16 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.schedule as row (row.id)}
-								{@const inv = activeInvoice(row.id)}
+							{#each scheduleRows as row (row.id)}
+								{@const invs = activeInvoices(row.id)}
 								{@const status = installmentStatus(row)}
+								{@const billLabel = invs.length
+									? `Tagih sisa ${rupiah(row.unbilled)}`
+									: 'Buat invoice'}
 								<tr data-kind={row.kind}>
 									<td class="font-semibold">{INSTALLMENT_LABEL[row.kind]}</td>
 									<td>
-										{#if row.kind === 'dp'}
+										{#if isFirstInstallment(row.kind)}
 											<span class="text-ink-2">Sebelum Booked</span>
 										{:else if row.dueDate}
 											{dateID(row.dueDate)}
@@ -347,22 +369,25 @@
 									>
 									<td><span class="chip {status.tone}">{status.label}</span></td>
 									<td>
-										{#if inv}
-											{#if data.allow.invoices.read}
-												<a
-													class="underline-offset-2 hover:underline"
-													href={resolve('/admin/(app)/keuangan/invoice/[id]', { id: inv.id })}
-													>{inv.number}</a
+										<div class="flex flex-col items-start gap-1">
+											{#each invs as inv (inv.id)}
+												{#if data.allow.invoices.read}
+													<a
+														class="underline-offset-2 hover:underline"
+														href={resolve('/admin/(app)/keuangan/invoice/[id]', { id: inv.id })}
+														>{inv.number}</a
+													>
+												{:else}<span>{inv.number}</span>{/if}
+											{/each}
+											{#if canBill(row)}
+												<button
+													type="button"
+													class="btn btn--secondary"
+													onclick={() => openInstallmentInvoice(row)}
+													aria-label="{billLabel} {INSTALLMENT_LABEL[row.kind]}">{billLabel}</button
 												>
-											{:else}{inv.number}{/if}
-										{:else if canBill(row)}
-											<button
-												type="button"
-												class="btn btn--secondary"
-												onclick={() => openInstallmentInvoice(row)}
-												aria-label="Buat invoice {INSTALLMENT_LABEL[row.kind]}">Buat invoice</button
-											>
-										{:else}<span class="text-ink-2">–</span>{/if}
+											{:else if !invs.length}<span class="text-ink-2">–</span>{/if}
+										</div>
 									</td>
 								</tr>
 							{/each}
@@ -370,8 +395,9 @@
 					</table>
 				</div>
 				<p class="text-small text-ink-2">
-					DP {DP_PERCENT}% tetap dari harga disepakati; pelunasan jatuh tempo di Hari H dan ikut
-					berubah bila harga atau tanggal sesi berubah.
+					DP {DP_PERCENT}% dari harga disepakati, atau lunas sekaligus (pilih saat membuat invoice
+					DP). Pelunasan jatuh tempo di Hari H dan ikut berubah bila harga atau tanggal sesi
+					berubah; add-on setelah termin ditagih masuk lewat "Tagih sisa".
 				</p>
 
 				<div class="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -859,6 +885,9 @@
 		bind:open={installmentOpen}
 		installment={billing}
 		bookingTitle={b.title}
+		choice={billing && isFirstInstallment(billing.kind) && firstSwitchable
+			? { dp: splitPrice(b.agreedPrice).dp, full: scheduledTotal }
+			: null}
 	/>
 	<CustomInvoiceDrawer bind:open={customOpen} bookingId={b.id} bookingTitle={b.title} />
 {/if}
