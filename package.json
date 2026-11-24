@@ -17,6 +17,7 @@
 		"test:e2e": "playwright test",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
+		"db:migrate:prod": "tsx scripts/migrate-production.ts",
 		"db:studio": "drizzle-kit studio",
 		"user:create": "tsx scripts/create-user.ts",
 		"storage:cors": "tsx scripts/storage-cors.ts",
